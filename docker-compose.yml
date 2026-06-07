@@ -1,0 +1,45 @@
+version: "3.8"
+
+services:
+  # ---------- CowAgent 主服务 ----------
+  cowagent:
+    build: .
+    ports:
+      - "${API_PORT:-8081}:8081"   # SaaS 管理 API
+      - "${WEB_PORT:-8080}:8080"   # Web 控制台
+    environment:
+      # 多租户开关
+      SAAS_MODE: "true"
+      # 运行时数据库连接（cowagent 用户）
+      DATABASE_URL: postgresql://cowagent:${PG_PASSWORD:-cowagent_secret}@host.docker.internal:5432/cowagent
+      # 初始化数据库连接（超级用户，用于建表+授权，仅 init-db 使用）
+      INIT_DB_URL: ${INIT_DB_URL:-postgresql://cowagent:${PG_PASSWORD:-cowagent_secret}@host.docker.internal:5432/cowagent}
+      # LLM 配置
+      OPEN_AI_API_KEY: ${OPEN_AI_API_KEY:-}
+      OPEN_AI_API_BASE: ${OPEN_AI_API_BASE:-https://api.openai.com/v1}
+      MODEL: ${MODEL:-gpt-4o-mini}
+      # 通道配置
+      CHANNEL_TYPE: ${CHANNEL_TYPE:-web}
+      # 工作目录
+      COW_WORKSPACE: /data
+    volumes:
+      - cowdata:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # 启动前自动初始化数据库（用 INIT_DB_URL 建表+授权，用 DATABASE_URL 运行）
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        INIT_URL="$${INIT_DB_URL:-$$DATABASE_URL}"
+        python scripts/saas_admin.py init-db --database-url "$$INIT_URL" 2>/dev/null || true
+        exec python app.py
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  cowdata:

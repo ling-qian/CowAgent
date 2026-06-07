@@ -1,0 +1,77 @@
+version: "3.8"
+
+services:
+  # ---------- PostgreSQL + pgvector ----------
+  postgres:
+    image: pgvector/pgvector:pg16
+    platform: linux/amd64
+    environment:
+      POSTGRES_DB: cowagent
+      POSTGRES_USER: cowagent
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-cowagent_secret}
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cowagent"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------- Redis（缓存 + 限流计数器） ----------
+  redis:
+    image: redis:7-alpine
+    platform: linux/amd64
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------- CowAgent 主服务 ----------
+  cowagent:
+    build: .
+    platform: linux/amd64
+    ports:
+      - "${WEB_PORT:-8080}:8080"   # Web 控制台
+      - "${API_PORT:-8081}:8081"   # SaaS 管理 API
+    environment:
+      SAAS_MODE: "true"
+      DATABASE_URL: postgresql://cowagent:${PG_PASSWORD:-cowagent_secret}@postgres:5432/cowagent
+      REDIS_URL: redis://redis:6379/0
+      OPEN_AI_API_KEY: ${OPEN_AI_API_KEY:-}
+      OPEN_AI_API_BASE: ${OPEN_AI_API_BASE:-https://api.openai.com/v1}
+      MODEL: ${MODEL:-gpt-4o-mini}
+      CHANNEL_TYPE: ${CHANNEL_TYPE:-web}
+      COW_WORKSPACE: /data
+    volumes:
+      - cowdata:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        python scripts/saas_admin.py init-db --database-url "$$DATABASE_URL" 2>/dev/null || true
+        exec python app.py
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  cowdata:

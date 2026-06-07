@@ -1,0 +1,316 @@
+[INFO][2026-06-02 14:27:11][config.py:348] -   ____                _                    _   
+[INFO][2026-06-02 14:27:11][config.py:349] -  / ___|_____      __ / \   __ _  ___ _ __ | |_ 
+[INFO][2026-06-02 14:27:11][config.py:350] - | |   / _ \ \ /\ / // _ \ / _` |/ _ \ '_ \| __|
+[INFO][2026-06-02 14:27:11][config.py:351] - | |__| (_) \ V  V // ___ \ (_| |  __/ | | | |_ 
+[INFO][2026-06-02 14:27:11][config.py:352] -  \____\___/ \_/\_//_/   \_\__, |\___|_| |_|\__|
+[INFO][2026-06-02 14:27:11][config.py:353] -                           |___/                 
+[INFO][2026-06-02 14:27:11][config.py:354] - 
+[INFO][2026-06-02 14:27:11][config.py:403] - [INIT] load config: {'channel_type': 'web', 'model': '', 'cow_lang': 'zh', 'open_ai_api_key': '*****', 'open_ai_api_base': 'https://api.openai.com/v1', 'claude_api_key': '*****', 'claude_api_base': 'https://api.anthropic.com/v1', 'gemini_api_key': '*****', 'gemini_api_base': 'https://generativelanguage.googleapis.com', 'zhipu_ai_api_key': '*****', 'moonshot_api_key': '*****', 'ark_api_key': '*****', 'dashscope_api_key': '*****', 'minimax_api_key': '*****', 'deepseek_api_key': '*****', 'deepseek_api_base': 'https://api.deepseek.com/v1', 'voice_to_text': 'openai', 'text_to_voice': 'openai', 'voice_reply_voice': False, 'speech_recognition': True, 'group_speech_recognition': False, 'use_linkai': False, 'linkai_api_key': '*****', 'linkai_app_code': '', 'agent': True, 'agent_max_context_tokens': 40000, 'agent_max_context_turns': 30, 'agent_max_steps': 15, 'web_port': 9899}
+[INFO][2026-06-02 14:27:11][config.py:406] - [INIT] ========================================
+[INFO][2026-06-02 14:27:11][config.py:407] - [INIT] System Initialization
+[INFO][2026-06-02 14:27:11][config.py:408] - [INIT] ========================================
+[INFO][2026-06-02 14:27:11][config.py:409] - [INIT] Language: zh
+[INFO][2026-06-02 14:27:11][config.py:410] - [INIT] Channel: web
+[INFO][2026-06-02 14:27:11][config.py:411] - [INIT] Model: 
+[INFO][2026-06-02 14:27:11][config.py:416] - [INIT] Mode: Agent (workspace: ~/cow)
+[INFO][2026-06-02 14:27:11][config.py:420] - [INIT] Debug: False
+[INFO][2026-06-02 14:27:11][config.py:421] - [INIT] ========================================
+[INFO][2026-06-02 14:27:11][config.py:480] - [INIT] Synced 4 config values to environment variables
+[INFO][2026-06-02 14:27:11][app.py:330] - [App] Synced 3 builtin skill(s) to workspace
+/Users/tom/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+[INFO][2026-06-02 14:27:12][scheduler_service.py:69] - [Scheduler] Scheduler loop started
+[INFO][2026-06-02 14:27:12][integration.py:97] - [Scheduler] Service initialized and started
+[INFO][2026-06-02 14:27:12][app.py:369] - [App] Starting channels: ['web']
+[INFO][2026-06-02 14:27:12][plugin_manager.py:125] - Plugin COW_CLI not found in pconfig, adding to pconfig...
+[INFO][2026-06-02 14:27:12][plugin_manager.py:125] - Plugin GODCMD not found in pconfig, adding to pconfig...
+[INFO][2026-06-02 14:27:12][plugin_manager.py:125] - Plugin KEYWORD not found in pconfig, adding to pconfig...
+[INFO][2026-06-02 14:27:12][plugin_manager.py:125] - Plugin BANWORDS not found in pconfig, adding to pconfig...
+[INFO][2026-06-02 14:27:12][plugin_manager.py:125] - Plugin LINKAI not found in pconfig, adding to pconfig...
+[INFO][2026-06-02 14:27:12][plugin_manager.py:125] - Plugin ROLE not found in pconfig, adding to pconfig...
+[INFO][2026-06-02 14:27:12][plugin_manager.py:125] - Plugin DUNGEON not found in pconfig, adding to pconfig...
+[INFO][2026-06-02 14:27:12][plugin_manager.py:125] - Plugin HELLO not found in pconfig, adding to pconfig...
+[INFO][2026-06-02 14:27:12][plugin_manager.py:125] - Plugin FINISH not found in pconfig, adding to pconfig...
+[INFO][2026-06-02 14:27:12][godcmd.py:196] - [Godcmd] 因未设置口令，本次的临时口令为7824。
+[WARNING][2026-06-02 14:27:12][plugin_manager.py:152] - Failed to init BANWORDS, diabled. [Errno 2] No such file or directory: '/Users/tom/work/CowAgent/plugins/banwords/banwords.txt'
+[INFO][2026-06-02 14:27:12][web_channel.py:1029] - [WebChannel] Available channels (edit `channel_type` in config.json to switch, separate multiple with commas):
+[INFO][2026-06-02 14:27:12][web_channel.py:1031] - [WebChannel]   1. web              - Web
+[INFO][2026-06-02 14:27:12][web_channel.py:1032] - [WebChannel]   2. terminal         - Terminal
+[INFO][2026-06-02 14:27:12][web_channel.py:1033] - [WebChannel]   3. weixin           - WeChat
+[INFO][2026-06-02 14:27:12][web_channel.py:1034] - [WebChannel]   4. feishu           - Feishu
+[INFO][2026-06-02 14:27:12][web_channel.py:1035] - [WebChannel]   5. dingtalk         - DingTalk
+[INFO][2026-06-02 14:27:12][web_channel.py:1036] - [WebChannel]   6. wecom_bot        - WeCom Bot
+[INFO][2026-06-02 14:27:12][web_channel.py:1037] - [WebChannel]   7. wechatcom_app    - WeCom App
+[INFO][2026-06-02 14:27:12][web_channel.py:1038] - [WebChannel]   8. wechat_kf        - WeChat Customer Service
+[INFO][2026-06-02 14:27:12][web_channel.py:1039] - [WebChannel]   9. wechatmp         - WeChat Official Account
+[INFO][2026-06-02 14:27:12][web_channel.py:1040] - [WebChannel]  10. wechatmp_service - WeChat Official Account (Service)
+[INFO][2026-06-02 14:27:12][web_channel.py:1041] - [WebChannel]  11. telegram         - Telegram
+[INFO][2026-06-02 14:27:12][web_channel.py:1042] - [WebChannel]  12. slack            - Slack
+[INFO][2026-06-02 14:27:12][web_channel.py:1043] - [WebChannel]  13. discord          - Discord
+[INFO][2026-06-02 14:27:12][web_channel.py:1044] - [WebChannel] ✅ Web console is running
+[INFO][2026-06-02 14:27:12][web_channel.py:1045] - [WebChannel] 🌐 Local access: http://localhost:9899
+[INFO][2026-06-02 14:27:12][web_channel.py:1051] - [WebChannel] 🔒 Listening on 127.0.0.1 only (local access). For public access, set web_host to 0.0.0.0 and configure web_password
+[INFO][2026-06-02 14:27:28][bridge.py:136] - create bot openai for chat
+[INFO][2026-06-02 14:27:28][channel.py:80] - [Channel] Using agent mode
+[INFO][2026-06-02 14:27:28][manager.py:61] - [MemoryManager] No embedding provider; memory will use keyword search only
+[INFO][2026-06-02 14:27:28][agent_initializer.py:763] - [DailyFlush] Next flush at 2026-06-02 23:54:37 (in 9.5h)
+[INFO][2026-06-02 14:27:28][agent_stream.py:354] - 🤖  | 👤 安装 SDK
+[INFO][2026-06-02 14:27:28][agent_stream.py:390] - [Agent] Turn 1
+[INFO][2026-06-02 14:27:28][agent_stream.py:725] - Sending 11 messages (6 turns) to LLM
+[ERROR][2026-06-02 14:28:43][agent_stream.py:835] - 🔴 Stream API Error:
+[ERROR][2026-06-02 14:28:43][agent_stream.py:836] -    Message: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))
+[ERROR][2026-06-02 14:28:43][agent_stream.py:837] -    Status Code: 0
+[ERROR][2026-06-02 14:28:43][agent_stream.py:838] -    Error Code: 
+[ERROR][2026-06-02 14:28:43][agent_stream.py:839] -    Error Type: 
+[ERROR][2026-06-02 14:28:43][agent_stream.py:840] -    Full chunk: {'error': {'message': 'Connection error: HTTPSConnectionPool(host=\'api.openai.com\', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host=\'api.openai.com\', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))', 'code': '', 'type': ''}, 'message': 'Connection error: HTTPSConnectionPool(host=\'api.openai.com\', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host=\'api.openai.com\', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))', 'status_code': 0}
+[WARNING][2026-06-02 14:28:43][agent_stream.py:1005] - ⚠️ LLM API error (attempt 1/3): Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+[INFO][2026-06-02 14:28:43][agent_stream.py:1006] - Retrying in 2s...
+[INFO][2026-06-02 14:28:45][agent_stream.py:725] - Sending 11 messages (6 turns) to LLM
+[ERROR][2026-06-02 14:30:00][agent_stream.py:835] - 🔴 Stream API Error:
+[ERROR][2026-06-02 14:30:00][agent_stream.py:836] -    Message: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))
+[ERROR][2026-06-02 14:30:00][agent_stream.py:837] -    Status Code: 0
+[ERROR][2026-06-02 14:30:00][agent_stream.py:838] -    Error Code: 
+[ERROR][2026-06-02 14:30:00][agent_stream.py:839] -    Error Type: 
+[ERROR][2026-06-02 14:30:00][agent_stream.py:840] -    Full chunk: {'error': {'message': 'Connection error: HTTPSConnectionPool(host=\'api.openai.com\', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host=\'api.openai.com\', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))', 'code': '', 'type': ''}, 'message': 'Connection error: HTTPSConnectionPool(host=\'api.openai.com\', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host=\'api.openai.com\', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))', 'status_code': 0}
+[WARNING][2026-06-02 14:30:00][agent_stream.py:1005] - ⚠️ LLM API error (attempt 2/3): Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+[INFO][2026-06-02 14:30:00][agent_stream.py:1006] - Retrying in 4s...
+[INFO][2026-06-02 14:30:04][agent_stream.py:725] - Sending 11 messages (6 turns) to LLM
+[ERROR][2026-06-02 14:31:19][agent_stream.py:835] - 🔴 Stream API Error:
+[ERROR][2026-06-02 14:31:19][agent_stream.py:836] -    Message: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))
+[ERROR][2026-06-02 14:31:19][agent_stream.py:837] -    Status Code: 0
+[ERROR][2026-06-02 14:31:19][agent_stream.py:838] -    Error Code: 
+[ERROR][2026-06-02 14:31:19][agent_stream.py:839] -    Error Type: 
+[ERROR][2026-06-02 14:31:19][agent_stream.py:840] -    Full chunk: {'error': {'message': 'Connection error: HTTPSConnectionPool(host=\'api.openai.com\', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host=\'api.openai.com\', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))', 'code': '', 'type': ''}, 'message': 'Connection error: HTTPSConnectionPool(host=\'api.openai.com\', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host=\'api.openai.com\', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))', 'status_code': 0}
+[WARNING][2026-06-02 14:31:19][agent_stream.py:1005] - ⚠️ LLM API error (attempt 3/3): Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+[INFO][2026-06-02 14:31:19][agent_stream.py:1006] - Retrying in 6s...
+[INFO][2026-06-02 14:31:25][agent_stream.py:725] - Sending 11 messages (6 turns) to LLM
+[INFO][2026-06-02 14:32:36][web_channel.py:1645] - [WebChannel] Config updated: ['model', 'use_linkai', 'bot_type']
+[INFO][2026-06-02 14:32:36][web_channel.py:1664] - [WebChannel] Bridge bot routing reset due to config change
+[ERROR][2026-06-02 14:32:40][agent_stream.py:835] - 🔴 Stream API Error:
+[ERROR][2026-06-02 14:32:40][agent_stream.py:836] -    Message: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))
+[ERROR][2026-06-02 14:32:40][agent_stream.py:837] -    Status Code: 0
+[ERROR][2026-06-02 14:32:40][agent_stream.py:838] -    Error Code: 
+[ERROR][2026-06-02 14:32:40][agent_stream.py:839] -    Error Type: 
+[ERROR][2026-06-02 14:32:40][agent_stream.py:840] -    Full chunk: {'error': {'message': 'Connection error: HTTPSConnectionPool(host=\'api.openai.com\', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host=\'api.openai.com\', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))', 'code': '', 'type': ''}, 'message': 'Connection error: HTTPSConnectionPool(host=\'api.openai.com\', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host=\'api.openai.com\', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))', 'status_code': 0}
+[ERROR][2026-06-02 14:32:40][agent_stream.py:1015] - ❌ LLM API error after 3 retries: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+Traceback (most recent call last):
+  File "/Users/tom/work/CowAgent/agent/protocol/agent_stream.py", line 856, in _call_llm_stream
+    raise Exception(f"{error_msg} (Status: {status_code}, Code: {error_code}, Type: {error_type})")
+Exception: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tom/work/CowAgent/agent/protocol/agent_stream.py", line 856, in _call_llm_stream
+    raise Exception(f"{error_msg} (Status: {status_code}, Code: {error_code}, Type: {error_type})")
+Exception: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tom/work/CowAgent/agent/protocol/agent_stream.py", line 856, in _call_llm_stream
+    raise Exception(f"{error_msg} (Status: {status_code}, Code: {error_code}, Type: {error_type})")
+Exception: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tom/work/CowAgent/agent/protocol/agent_stream.py", line 856, in _call_llm_stream
+    raise Exception(f"{error_msg} (Status: {status_code}, Code: {error_code}, Type: {error_type})")
+Exception: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+[ERROR][2026-06-02 14:32:40][agent_stream.py:688] - ❌ Agent execution error: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+[WARNING][2026-06-02 14:32:40][web_channel.py:436] - [WebChannel] agent_stream emitted error for request 7ff8b572-d29c-4a76-9338-d464097365eb: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+[INFO][2026-06-02 14:32:40][agent_stream.py:697] - [Agent] 🏁 Done (1 turns)
+[ERROR][2026-06-02 14:32:40][agent_bridge.py:530] - Agent reply error: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+[INFO][2026-06-02 14:33:10][channel.py:80] - [Channel] Using agent mode
+[INFO][2026-06-02 14:33:10][manager.py:61] - [MemoryManager] No embedding provider; memory will use keyword search only
+[INFO][2026-06-02 14:33:10][agent_initializer.py:763] - [DailyFlush] Next flush at 2026-06-02 23:55:55 (in 9.4h)
+[INFO][2026-06-02 14:33:10][agent_stream.py:354] - 🤖 天工 | 👤 hi
+[INFO][2026-06-02 14:33:10][agent_stream.py:390] - [Agent] Turn 1
+[INFO][2026-06-02 14:33:10][agent_stream.py:725] - Sending 11 messages (6 turns) to LLM
+[ERROR][2026-06-02 14:34:25][agent_stream.py:835] - 🔴 Stream API Error:
+[ERROR][2026-06-02 14:34:25][agent_stream.py:836] -    Message: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))
+[ERROR][2026-06-02 14:34:25][agent_stream.py:837] -    Status Code: 0
+[ERROR][2026-06-02 14:34:25][agent_stream.py:838] -    Error Code: 
+[ERROR][2026-06-02 14:34:25][agent_stream.py:839] -    Error Type: 
+[ERROR][2026-06-02 14:34:25][agent_stream.py:840] -    Full chunk: {'error': {'message': 'Connection error: HTTPSConnectionPool(host=\'api.openai.com\', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host=\'api.openai.com\', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))', 'code': '', 'type': ''}, 'message': 'Connection error: HTTPSConnectionPool(host=\'api.openai.com\', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host=\'api.openai.com\', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))', 'status_code': 0}
+[WARNING][2026-06-02 14:34:25][agent_stream.py:1005] - ⚠️ LLM API error (attempt 1/3): Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+[INFO][2026-06-02 14:34:25][agent_stream.py:1006] - Retrying in 2s...
+[INFO][2026-06-02 14:34:27][agent_stream.py:725] - Sending 11 messages (6 turns) to LLM
+[ERROR][2026-06-02 14:35:42][agent_stream.py:835] - 🔴 Stream API Error:
+[ERROR][2026-06-02 14:35:42][agent_stream.py:836] -    Message: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))
+[ERROR][2026-06-02 14:35:42][agent_stream.py:837] -    Status Code: 0
+[ERROR][2026-06-02 14:35:42][agent_stream.py:838] -    Error Code: 
+[ERROR][2026-06-02 14:35:42][agent_stream.py:839] -    Error Type: 
+[ERROR][2026-06-02 14:35:42][agent_stream.py:840] -    Full chunk: {'error': {'message': 'Connection error: HTTPSConnectionPool(host=\'api.openai.com\', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host=\'api.openai.com\', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))', 'code': '', 'type': ''}, 'message': 'Connection error: HTTPSConnectionPool(host=\'api.openai.com\', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host=\'api.openai.com\', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))', 'status_code': 0}
+[WARNING][2026-06-02 14:35:42][agent_stream.py:1005] - ⚠️ LLM API error (attempt 2/3): Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+[INFO][2026-06-02 14:35:42][agent_stream.py:1006] - Retrying in 4s...
+[INFO][2026-06-02 14:35:46][agent_stream.py:725] - Sending 11 messages (6 turns) to LLM
+[ERROR][2026-06-02 14:37:01][agent_stream.py:835] - 🔴 Stream API Error:
+[ERROR][2026-06-02 14:37:01][agent_stream.py:836] -    Message: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))
+[ERROR][2026-06-02 14:37:01][agent_stream.py:837] -    Status Code: 0
+[ERROR][2026-06-02 14:37:01][agent_stream.py:838] -    Error Code: 
+[ERROR][2026-06-02 14:37:01][agent_stream.py:839] -    Error Type: 
+[ERROR][2026-06-02 14:37:01][agent_stream.py:840] -    Full chunk: {'error': {'message': 'Connection error: HTTPSConnectionPool(host=\'api.openai.com\', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host=\'api.openai.com\', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))', 'code': '', 'type': ''}, 'message': 'Connection error: HTTPSConnectionPool(host=\'api.openai.com\', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host=\'api.openai.com\', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))', 'status_code': 0}
+[WARNING][2026-06-02 14:37:01][agent_stream.py:1005] - ⚠️ LLM API error (attempt 3/3): Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+[INFO][2026-06-02 14:37:01][agent_stream.py:1006] - Retrying in 6s...
+[INFO][2026-06-02 14:37:07][agent_stream.py:725] - Sending 11 messages (6 turns) to LLM
+[ERROR][2026-06-02 14:38:22][agent_stream.py:835] - 🔴 Stream API Error:
+[ERROR][2026-06-02 14:38:23][agent_stream.py:836] -    Message: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))
+[ERROR][2026-06-02 14:38:23][agent_stream.py:837] -    Status Code: 0
+[ERROR][2026-06-02 14:38:23][agent_stream.py:838] -    Error Code: 
+[ERROR][2026-06-02 14:38:23][agent_stream.py:839] -    Error Type: 
+[ERROR][2026-06-02 14:38:23][agent_stream.py:840] -    Full chunk: {'error': {'message': 'Connection error: HTTPSConnectionPool(host=\'api.openai.com\', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host=\'api.openai.com\', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))', 'code': '', 'type': ''}, 'message': 'Connection error: HTTPSConnectionPool(host=\'api.openai.com\', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host=\'api.openai.com\', port=443): Failed to establish a new connection: [Errno 60] Operation timed out"))', 'status_code': 0}
+[ERROR][2026-06-02 14:38:23][agent_stream.py:1015] - ❌ LLM API error after 3 retries: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+Traceback (most recent call last):
+  File "/Users/tom/work/CowAgent/agent/protocol/agent_stream.py", line 856, in _call_llm_stream
+    raise Exception(f"{error_msg} (Status: {status_code}, Code: {error_code}, Type: {error_type})")
+Exception: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tom/work/CowAgent/agent/protocol/agent_stream.py", line 856, in _call_llm_stream
+    raise Exception(f"{error_msg} (Status: {status_code}, Code: {error_code}, Type: {error_type})")
+Exception: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tom/work/CowAgent/agent/protocol/agent_stream.py", line 856, in _call_llm_stream
+    raise Exception(f"{error_msg} (Status: {status_code}, Code: {error_code}, Type: {error_type})")
+Exception: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/tom/work/CowAgent/agent/protocol/agent_stream.py", line 856, in _call_llm_stream
+    raise Exception(f"{error_msg} (Status: {status_code}, Code: {error_code}, Type: {error_type})")
+Exception: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+[ERROR][2026-06-02 14:38:23][agent_stream.py:688] - ❌ Agent execution error: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+[WARNING][2026-06-02 14:38:23][web_channel.py:436] - [WebChannel] agent_stream emitted error for request 8dcfb2d5-cc97-443d-838a-5fa00d808bd5: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+[INFO][2026-06-02 14:38:23][agent_stream.py:697] - [Agent] 🏁 Done (1 turns)
+[ERROR][2026-06-02 14:38:23][agent_bridge.py:530] - Agent reply error: Connection error: HTTPSConnectionPool(host='api.openai.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError("HTTPSConnection(host='api.openai.com', port=443): Failed to establish a new connection: [Errno 60] Operation timed out")) (Status: 0, Code: , Type: )
+[INFO][2026-06-02 14:41:44][service.py:50] - [SkillService] query: 18 skills found
+[INFO][2026-06-02 14:43:57][web_channel.py:2695] - [ModelsHandler] chat updated: {'model': '天工'}
+[INFO][2026-06-02 14:43:57][web_channel.py:2872] - [ModelsHandler] Bridge bot routing reset
+[INFO][2026-06-02 14:44:44][web_channel.py:1645] - [WebChannel] Config updated: ['agent_max_context_tokens', 'agent_max_context_turns', 'agent_max_steps', 'enable_thinking']
+[INFO][2026-06-02 14:45:39][web_channel.py:1645] - [WebChannel] Config updated: ['model', 'use_linkai', 'bot_type', 'custom_api_base', 'custom_api_key']
+[INFO][2026-06-02 14:45:39][web_channel.py:1664] - [WebChannel] Bridge bot routing reset due to config change
+[INFO][2026-06-02 14:45:46][channel.py:80] - [Channel] Using agent mode
+[INFO][2026-06-02 14:45:46][manager.py:61] - [MemoryManager] No embedding provider; memory will use keyword search only
+[INFO][2026-06-02 14:45:46][agent_initializer.py:763] - [DailyFlush] Next flush at 2026-06-02 23:52:41 (in 9.1h)
+[INFO][2026-06-02 14:45:46][agent_stream.py:354] - 🤖 天工 | 💭 thinking | 👤 hi
+[INFO][2026-06-02 14:45:46][agent_stream.py:390] - [Agent] Turn 1
+[INFO][2026-06-02 14:45:46][agent_stream.py:725] - Sending 31 messages (16 turns) to LLM
+[WARNING][2026-06-02 14:45:48][agent_stream.py:1053] - ⚠️  LLM returned empty response (stop_reason: None), retrying once...
+[INFO][2026-06-02 14:45:48][agent_stream.py:725] - Sending 31 messages (16 turns) to LLM
+[WARNING][2026-06-02 14:45:50][agent_stream.py:401] - [Agent] LLM returned empty response after retry (no content and no tool calls)
+[INFO][2026-06-02 14:45:50][agent_stream.py:402] - [Agent] This usually happens when LLM thinks the task is complete after tool execution
+[INFO][2026-06-02 14:45:50][agent_stream.py:454] - Generated fallback response for empty LLM output
+[INFO][2026-06-02 14:45:50][agent_stream.py:697] - [Agent] 🏁 Done (1 turns)
+[INFO][2026-06-02 14:49:32][web_channel.py:2695] - [ModelsHandler] chat updated: {'bot_type': 'custom', 'use_linkai': False, 'model': 'skywork-ai/skyclaw-v1'}
+[INFO][2026-06-02 14:49:32][web_channel.py:2872] - [ModelsHandler] Bridge bot routing reset
+[INFO][2026-06-02 14:49:48][web_channel.py:1645] - [WebChannel] Config updated: ['model', 'use_linkai', 'bot_type', 'custom_api_base']
+[INFO][2026-06-02 14:49:48][web_channel.py:1664] - [WebChannel] Bridge bot routing reset due to config change
+[INFO][2026-06-02 14:50:00][channel.py:80] - [Channel] Using agent mode
+[INFO][2026-06-02 14:50:00][manager.py:61] - [MemoryManager] No embedding provider; memory will use keyword search only
+[INFO][2026-06-02 14:50:00][agent_initializer.py:763] - [DailyFlush] Next flush at 2026-06-02 23:53:25 (in 9.1h)
+[INFO][2026-06-02 14:50:00][agent_stream.py:354] - 🤖 skywork-ai/skyclaw-v1 | 💭 thinking | 👤 你好
+[INFO][2026-06-02 14:50:00][agent_stream.py:390] - [Agent] Turn 1
+[INFO][2026-06-02 14:50:00][agent_stream.py:725] - Sending 30 messages (16 turns) to LLM
+[INFO][2026-06-02 14:50:05][agent_stream.py:456] - 💭 
+
+你好！有什么我可以帮你的吗？😊
+[INFO][2026-06-02 14:50:05][agent_stream.py:697] - [Agent] 🏁 Done (1 turns)
+[INFO][2026-06-02 14:51:02][channel.py:80] - [Channel] Using agent mode
+[INFO][2026-06-02 14:51:02][agent_stream.py:354] - 🤖 skywork-ai/skyclaw-v1 | 💭 thinking | 👤 你还记得之前你做的最后的任务是什么吗
+[INFO][2026-06-02 14:51:02][agent_stream.py:390] - [Agent] Turn 1
+[INFO][2026-06-02 14:51:02][agent_stream.py:725] - Sending 32 messages (17 turns) to LLM
+[INFO][2026-06-02 14:51:12][agent_stream.py:456] - 💭 
+
+记得！我最近做的主要任务有：
+
+1. **为企业微信美容师客服机器人（v11）接入了 LinkAI LLM**
+   - 测试了 LinkAI API 的连通性
+   - 修改了 `bot.js` 代码，添加了 `callLinkAI()` 函数和对话记忆功能
+   - 测试了 FAQ 匹配 +...
+[INFO][2026-06-02 14:51:12][agent_stream.py:697] - [Agent] 🏁 Done (1 turns)
+[INFO][2026-06-02 14:53:17][channel.py:80] - [Channel] Using agent mode
+[INFO][2026-06-02 14:53:17][agent_stream.py:354] - 🤖 skywork-ai/skyclaw-v1 | 💭 thinking | 👤 你现在能和https://link-ai.tech/console/superagent?code=Xa3K3ECE对接了吗
+[INFO][2026-06-02 14:53:17][agent_stream.py:390] - [Agent] Turn 1
+[INFO][2026-06-02 14:53:17][agent_stream.py:725] - Sending 34 messages (18 turns) to LLM
+[INFO][2026-06-02 14:53:27][agent_stream.py:456] - 💭 
+
+抱歉，我无法直接访问或连接网页控制台界面。我是通过处理你的请求来工作的，没有浏览器登录功能。
+
+不过，这个代码 **`Xa3K3ECE`** 看起来是 LinkAI 的 SuperAgent 代码。你是想让我帮你把它配置到 CowAgent 里吗？
+
+我可以帮你：
+1. 在 `config.js...
+[INFO][2026-06-02 14:53:27][agent_stream.py:697] - [Agent] 🏁 Done (1 turns)
+[INFO][2026-06-02 14:54:02][channel.py:80] - [Channel] Using agent mode
+[INFO][2026-06-02 14:54:02][agent_stream.py:354] - 🤖 skywork-ai/skyclaw-v1 | 💭 thinking | 👤 pip3 install --upgrade linkai
+[INFO][2026-06-02 14:54:02][agent_stream.py:390] - [Agent] Turn 1
+[INFO][2026-06-02 14:54:02][agent_stream.py:725] - Sending 36 messages (19 turns) to LLM
+[INFO][2026-06-02 14:54:10][agent_stream.py:486] - 🔧 bash(command=pip3 install --upgrade linkai, timeout=60)
+[INFO][2026-06-02 14:54:12][agent_stream.py:534] -   ✅ bash (2.16s): {"output": "Defaulting to user installation because normal site-packages is not writeable\nCollecting linkai\n  Downloading linkai-0.1.8-py3-none-any.whl.metadata (451 bytes)\nDownloading linkai-0.1.8...
+[INFO][2026-06-02 14:54:12][agent_stream.py:390] - [Agent] Turn 2
+[INFO][2026-06-02 14:54:12][agent_stream.py:725] - Sending 38 messages (19 turns) to LLM
+[INFO][2026-06-02 14:54:17][agent_stream.py:486] - 🔧 bash(command=pip3 show linkai && python3 -c "import linkai; print(dir(linkai))", timeout=10)
+[INFO][2026-06-02 14:54:17][agent_stream.py:534] -   ✅ bash (0.61s): {"output": "Name: linkai\nVersion: 0.1.8\nSummary: LinkAI python sdk\nHome-page: \nAuthor: \nAuthor-email: \nLicense: \nLocation: /Users/tom/Library/Python/3.9/lib/python/site-packages\nRequires: \nRe...
+[INFO][2026-06-02 14:54:17][agent_stream.py:390] - [Agent] Turn 3
+[INFO][2026-06-02 14:54:17][agent_stream.py:725] - Sending 40 messages (19 turns) to LLM
+[INFO][2026-06-02 14:54:23][agent_stream.py:486] - 🔧 bash(command=python3 -c "
+import linkai.api as api
+print(dir(api))
+", timeout=10)
+[INFO][2026-06-02 14:54:23][agent_stream.py:534] -   ✅ bash (0.08s): {"output": "['__builtins__', '__cached__', '__doc__', '__file__', '__loader__', '__name__', '__package__', '__path__', '__spec__', 'client']\n", "exit_code": 0, "details": null}
+[INFO][2026-06-02 14:54:23][agent_stream.py:390] - [Agent] Turn 4
+[INFO][2026-06-02 14:54:23][agent_stream.py:725] - Sending 42 messages (19 turns) to LLM
+[INFO][2026-06-02 14:54:27][agent_stream.py:486] - 🔧 web_fetch(url=https://link-ai.tech/console/superagent?code=Xa3K3ECE)
+[INFO][2026-06-02 14:54:27][agent_stream.py:534] -   ✅ web_fetch (0.07s): Title: 
+
+Content:
+We're sorry but ai-chat-web doesn't work properly without JavaScript enabled. Please enable it to continue.
+[INFO][2026-06-02 14:54:27][agent_stream.py:390] - [Agent] Turn 5
+[INFO][2026-06-02 14:54:27][agent_stream.py:725] - Sending 44 messages (19 turns) to LLM
+[INFO][2026-06-02 14:54:32][agent_stream.py:486] - 🔧 read(path=/Users/tom/work/CowAgent/config.json)
+[INFO][2026-06-02 14:54:32][agent_stream.py:534] -   ✅ read (0.00s): {"content": "{\n    \"channel_type\": \"web\",\n    \"model\": \"skywork-ai/skyclaw-v1\",\n    \"cow_lang\": \"zh\",\n    \"open_ai_api_key\": \"\",\n    \"open_ai_api_base\": \"https://api.openai.com...
+[INFO][2026-06-02 14:54:32][agent_stream.py:390] - [Agent] Turn 6
+[INFO][2026-06-02 14:54:32][agent_stream.py:725] - Sending 46 messages (19 turns) to LLM
+[INFO][2026-06-02 14:54:54][agent_stream.py:486] - 🔧 edit(path=/Users/tom/work/CowAgent/config.json, oldText=    "use_linkai": false,
+    "linkai_api_key": "",
+    "linkai_app_code": "",, newText=    "use_linkai": true,
+    "linkai_api_key": "Link_Qplv5IQqzUghjodWHO7aBQRgOfsSbUW8Dy37VPo1Ak",
+    "linkai_app_code": "Xa3K3ECE",)
+[INFO][2026-06-02 14:54:54][agent_stream.py:534] -   ✅ edit (0.00s): {"message": "Successfully replaced text in /Users/tom/work/CowAgent/config.json", "path": "/Users/tom/work/CowAgent/config.json", "diff": "--- original\n+++ modified\n@@ -20,9 +20,9 @@\n     \"voice_r...
+[INFO][2026-06-02 14:54:54][agent_stream.py:390] - [Agent] Turn 7
+[INFO][2026-06-02 14:54:54][agent_stream.py:725] - Sending 48 messages (19 turns) to LLM
+[INFO][2026-06-02 14:55:01][agent_stream.py:456] - 💭 
+
+已成功为 CowAgent 配置 LinkAI SuperAgent！🎉
+
+## 配置文件更新完成
+**文件**：`/Users/tom/work/CowAgent/config.json`
+
+```json
+"use_linkai": true,
+"linkai_api_key": "Link...
+[INFO][2026-06-02 14:55:01][agent_stream.py:697] - [Agent] 🏁 Done (7 turns)
+[INFO][2026-06-02 14:55:25][channel.py:80] - [Channel] Using agent mode
+[INFO][2026-06-02 14:55:25][agent_stream.py:354] - 🤖 skywork-ai/skyclaw-v1 | 💭 thinking | 👤 重启 CowAgent 使配置生效
+[INFO][2026-06-02 14:55:25][agent_stream.py:390] - [Agent] Turn 1
+[INFO][2026-06-02 14:55:25][agent_stream.py:725] - Sending 50 messages (20 turns) to LLM
+[INFO][2026-06-02 14:55:31][agent_stream.py:486] - 🔧 bash(command=ps aux | grep -i cowagent | grep -v grep, timeout=5)
+[INFO][2026-06-02 14:55:31][agent_stream.py:534] -   ✅ bash (0.10s): {"output": "tom              86726   0.3  0.2 435807440  72224 s002  S+    2:27PM   0:02.73 /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/C...
+[INFO][2026-06-02 14:55:31][agent_stream.py:390] - [Agent] Turn 2
+[INFO][2026-06-02 14:55:31][agent_stream.py:725] - Sending 52 messages (20 turns) to LLM
+[INFO][2026-06-02 14:55:36][agent_event_handler.py:70] - 💭 找到了！CowAgent 正在运行中（PID: 86726）。正在重启...
+[INFO][2026-06-02 14:55:36][agent_stream.py:486] - 🔧 bash(command=kill 86726 && sleep 2 && ps aux | grep -i cowagent | grep -v grep, timeout=10)
+[INFO][2026-06-02 14:55:36][app.py:269] - signal 15 received, exiting...
+[INFO][2026-06-02 14:55:36][config.py:312] - [Config] User datas saved.
+[INFO][2026-06-02 14:55:38][agent_stream.py:534] -   ✅ bash (2.11s): {"output": "tom              86753   0.0  0.0 435299904    624 s002  S+    2:27PM   0:00.01 tail -n 30 -f /Users/tom/work/CowAgent/nohup.out\ntom              86726   0.0  0.2 435807440  72960 s002  S...
+[INFO][2026-06-02 14:55:38][agent_stream.py:390] - [Agent] Turn 3
+[INFO][2026-06-02 14:55:38][agent_stream.py:725] - Sending 54 messages (20 turns) to LLM
+[INFO][2026-06-02 14:55:43][agent_stream.py:486] - 🔧 bash(command=kill -9 86726 2>/dev/null; sleep 2 && ps aux | grep "CowAgent/app.py" | grep -v grep, timeout=10)
