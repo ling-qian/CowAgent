@@ -174,10 +174,22 @@ def lookup_api_key_cache(raw_key: str) -> Optional[str]:
 
 
 def invalidate_api_key(raw_key: str):
-    """使 API Key 缓存失效"""
+    """使 API Key 缓存失效（传入原始 key，会自动哈希）"""
     import hashlib
     key_hash = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
     cache_key = f"{API_KEY_CACHE_PREFIX}{key_hash}"
+    _get_backend().delete(cache_key)
+
+
+def invalidate_api_key_cache(key_hash_or_raw: str):
+    """使 API Key 缓存失效（兼容接口：接受原始 key 或已哈希的 key）"""
+    # 如果已经是 64 字符的 SHA256 哈希，直接用
+    if len(key_hash_or_raw) == 64 and all(c in '0123456789abcdef' for c in key_hash_or_raw):
+        cache_key = f"{API_KEY_CACHE_PREFIX}{key_hash_or_raw}"
+    else:
+        import hashlib
+        key_hash = hashlib.sha256(key_hash_or_raw.encode("utf-8")).hexdigest()
+        cache_key = f"{API_KEY_CACHE_PREFIX}{key_hash}"
     _get_backend().delete(cache_key)
 
 

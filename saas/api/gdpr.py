@@ -95,7 +95,8 @@ def _export_tenant_data(tenant_id: str) -> dict:
             "metric": r.metric,
             "value": r.value,
             "api_key_id": r.api_key_id,
-            "recorded_at": r.recorded_at.isoformat() if r.recorded_at else None,
+            "period": r.period,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
         }
         for r in usage_records
     ]

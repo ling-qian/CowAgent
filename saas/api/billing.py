@@ -101,6 +101,28 @@ def list_plans():
     })
 
 
+@billing_bp.route("/subscription", methods=["GET"])
+def get_subscription():
+    """获取当前租户的订阅信息"""
+    tenant_id = current_tenant_id()
+    if not tenant_id:
+        return jsonify({"error": "Tenant not authenticated"}), 401
+
+    tenant = db.session.get(Tenant, tenant_id)
+    if not tenant:
+        return jsonify({"error": "Tenant not found"}), 404
+
+    plan = get_plan(tenant.plan)
+    return jsonify({
+        "plan": tenant.plan,
+        "plan_name": plan["name"],
+        "price": plan["price"],
+        "quotas": plan["quotas"],
+        "is_active": tenant.is_active,
+        "created_at": tenant.created_at.isoformat() if tenant.created_at else None,
+    })
+
+
 @billing_bp.route("/check", methods=["POST"])
 def check_quota_endpoint():
     """检查某项配额是否充足

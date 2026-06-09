@@ -106,6 +106,12 @@ def _apply_tenant_config(tenant_id: str) -> dict:
                 original[cow_key] = conf().get(cow_key)
                 conf()[cow_key] = tenant_config[config_key]
 
+        # 应用租户级系统提示词（character_desc）
+        tenant_system_prompt = tenant_config.get("system_prompt")
+        if tenant_system_prompt:
+            original["character_desc"] = conf().get("character_desc")
+            conf()["character_desc"] = tenant_system_prompt
+
         # 根据模型名推断 bot_type 并设置对应的 API key/base
         model = tenant_config.get("model", "")
         api_key = tenant_config.get("api_key", "")
@@ -207,28 +213,18 @@ def _ensure_config_loaded():
 # ---------------------------------------------------------------------------
 
 def _record_usage(tenant_id: str, prompt_tokens: int, completion_tokens: int):
-    """记录 Token 用量到数据库"""
+    """记录 Token 用量到数据库（通过 usage.py 的 record_usage，含配额检查）"""
     try:
-        from saas.database import db, UsageRecord
-        from datetime import datetime, timezone
-        period = datetime.now(timezone.utc).strftime("%Y-%m")
-
-        record = UsageRecord.query.filter_by(
+        from saas.api.usage import record_usage
+        total = prompt_tokens + completion_tokens
+        allowed, remaining = record_usage(
             tenant_id=tenant_id,
             metric="llm_tokens",
-            period=period,
-        ).first()
-        if record:
-            record.value += prompt_tokens + completion_tokens
-        else:
-            record = UsageRecord(
-                tenant_id=tenant_id,
-                metric="llm_tokens",
-                value=prompt_tokens + completion_tokens,
-                period=period,
-            )
-            db.session.add(record)
-        db.session.commit()
+            value=total,
+            api_key_id=None,
+        )
+        if not allowed:
+            logger.warning(f"[ChatEngine] Quota exceeded for tenant {tenant_id}, tokens={total}")
     except Exception as e:
         logger.warning(f"[ChatEngine] Failed to record usage: {e}")
 
@@ -266,6 +262,9 @@ def chat(
     if not session_id:
         session_id = f"tenant_{tenant_id}_{uuid.uuid4().hex[:8]}"
 
+    # 追踪租户会话
+    _track_session(tenant_id, session_id)
+
     # 确保配置已加载
     _ensure_config_loaded()
 
@@ -285,13 +284,11 @@ def chat(
         context.kwargs["session_id"] = session_id
         context.kwargs["channel_type"] = "saas_api"
 
-        # 设置系统提示词（如果提供）
+        # 设置系统提示词（如果请求中提供，覆盖租户默认）
+        # 注意：租户默认的 system_prompt 已在 _apply_tenant_config 中设置到 character_desc
         if system_prompt:
             from config import conf
-            original_char_desc = conf().get("character_desc")
             conf()["character_desc"] = system_prompt
-        else:
-            original_char_desc = None
 
         try:
             # 判断是否使用 Agent 模式
@@ -342,11 +339,9 @@ def chat(
                 "mode": "agent" if use_agent else "chat",
             }
 
-        finally:
-            # 恢复系统提示词
-            if system_prompt and original_char_desc is not None:
-                from config import conf
-                conf()["character_desc"] = original_char_desc
+        except Exception as inner_e:
+            logger.error(f"[ChatEngine] Bridge call error: {inner_e}", exc_info=True)
+            raise
 
     except Exception as e:
         logger.error(f"[ChatEngine] CowAgent Bridge error: {e}", exc_info=True)
@@ -362,22 +357,38 @@ def chat(
 
 
 # ---------------------------------------------------------------------------
-# 会话管理（简化版，基于 AgentBridge 的内部会话管理）
+# 会话管理 — 基于 AgentBridge 的内部会话管理 + 租户会话追踪
 # ---------------------------------------------------------------------------
+
+# 租户会话追踪：tenant_id -> set of session_ids
+_tenant_sessions = {}
+_tenant_sessions_lock = threading.Lock()
+
+
+def _track_session(tenant_id: str, session_id: str):
+    """追踪租户的会话"""
+    with _tenant_sessions_lock:
+        if tenant_id not in _tenant_sessions:
+            _tenant_sessions[tenant_id] = set()
+        _tenant_sessions[tenant_id].add(session_id)
+
 
 def list_sessions(tenant_id: str) -> list:
     """列出租户的活跃会话"""
-    try:
-        bridge = _get_bridge()
-        agent_bridge = bridge.get_agent_bridge()
-        # AgentBridge 的 agents dict 按 session_id 存储
-        sessions = []
-        for sid in agent_bridge.agents.keys():
-            if sid.startswith(f"tenant_{tenant_id}_"):
+    sessions = []
+    # 从租户追踪中获取
+    with _tenant_sessions_lock:
+        tracked = _tenant_sessions.get(tenant_id, set())
+    for sid in tracked:
+        # 检查 AgentBridge 中是否还存在
+        try:
+            bridge = _get_bridge()
+            agent_bridge = bridge.get_agent_bridge()
+            if sid in agent_bridge.agents:
                 sessions.append(sid)
-        return sessions
-    except Exception:
-        return []
+        except Exception:
+            sessions.append(sid)  # 无法检查时也返回
+    return sessions
 
 
 def clear_session(session_id: str):

@@ -9,12 +9,18 @@ GET    /api/tenants/me/stats     — 获取当前租户统计信息
 """
 
 from flask import Blueprint, request, jsonify
+import re
 
 from common.tenant import current_tenant_id
 from saas.database import db, Tenant, User, ApiKey, UsageRecord
 from saas.audit import audit_log
 
 tenants_bp = Blueprint("tenants", __name__)
+
+# 邮箱格式验证
+_EMAIL_RE = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+# 危险字符检测（防 SQL 注入）
+_DANGEROUS_RE = re.compile(r"['\";\\]|(--)|(/\*)|(\*/)", re.IGNORECASE)
 
 
 def _client_ip():
@@ -35,6 +41,15 @@ def register_tenant():
 
     if not name or not slug or not email:
         return jsonify({"error": "name, slug, and email are required"}), 400
+
+    # 验证邮箱格式
+    if not _EMAIL_RE.match(email):
+        return jsonify({"error": "Invalid email format"}), 400
+
+    # 检测危险字符（防 SQL 注入）
+    for field_name, field_val in [("name", name), ("slug", slug), ("email", email)]:
+        if _DANGEROUS_RE.search(field_val):
+            return jsonify({"error": f"Invalid characters in {field_name}"}), 400
 
     # 检查 slug 和 email 是否已存在
     if Tenant.query.filter_by(slug=slug).first():

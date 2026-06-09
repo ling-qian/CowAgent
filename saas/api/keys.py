@@ -105,6 +105,10 @@ def revoke_api_key(key_id):
     api_key.is_active = False
     db.session.commit()
 
+    # 清除缓存，确保已吊销的 Key 立即失效
+    from saas.cache import invalidate_api_key_cache
+    invalidate_api_key_cache(api_key.key_hash)
+
     audit_log(
         action="api_key.revoke", resource_type="api_key", resource_id=key_id,
         detail=f"name={api_key.name}", tenant_id=tenant_id, ip_address=_client_ip(),

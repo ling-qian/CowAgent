@@ -354,6 +354,14 @@ def run():
 
                 saas_app = Flask(__name__)
                 CORS(saas_app)
+                # 全局 JSON 错误处理器 — 确保所有错误响应都返回 JSON
+                @saas_app.errorhandler(400)
+                @saas_app.errorhandler(404)
+                @saas_app.errorhandler(405)
+                @saas_app.errorhandler(500)
+                def json_error_handler(error):
+                    from flask import jsonify
+                    return jsonify({"error": error.description if hasattr(error, 'description') else str(error)}), error.code if hasattr(error, 'code') else 500
                 # Swagger API 文档
                 try:
                     from flasgger import Swagger
@@ -383,6 +391,27 @@ def run():
                     # Chat 对话蓝图
                     from saas.api.chat import chat_bp
                     saas_app.register_blueprint(chat_bp, url_prefix="/api/chat")
+                    # 根路由和 debug 路由
+                    @saas_app.route("/")
+                    def index():
+                        from flask import jsonify
+                        return jsonify({
+                            "service": "CowAgent SaaS",
+                            "status": "running",
+                            "docs": "/apidocs",
+                            "health": "/health",
+                        })
+                    @saas_app.route("/debug")
+                    def debug_info():
+                        from flask import jsonify, g
+                        routes = [rule.rule for rule in saas_app.url_map.iter_rules()]
+                        return jsonify({
+                            "blueprints_ok": True,
+                            "database_url_set": bool(conf().get("database_url")),
+                            "db_error": None,
+                            "routes_count": len(routes),
+                            "routes": sorted(routes),
+                        })
                     # Prometheus 监控指标
                     try:
                         from saas.metrics import metrics_middleware, create_metrics_blueprint
