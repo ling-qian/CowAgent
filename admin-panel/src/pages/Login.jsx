@@ -7,7 +7,7 @@ import { verifyApiKey } from '../api/client';
 const { Title, Text } = Typography;
 
 // 登录页面：通过输入API Key进行身份验证
-export default function Login() {
+export default function Login({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -16,8 +16,8 @@ export default function Login() {
     setLoading(true);
     try {
       await verifyApiKey(values.apiKey);
-      // 验证成功，将API Key保存到localStorage
-      localStorage.setItem('api_key', values.apiKey);
+      // 验证成功，通过回调通知 App 组件更新状态
+      onLogin(values.apiKey);
       message.success('登录成功');
       navigate('/dashboard');
     } catch (err) {

@@ -12,8 +12,10 @@ from saas.api.webhooks import webhooks_bp
 from saas.api.gdpr import gdpr_bp
 from saas.api.plugins import plugins_bp
 from saas.api.im_channels import bp as im_channels_bp
+from saas.api.chat import chat_bp
 
 __all__ = [
     "tenants_bp", "keys_bp", "usage_bp", "health_bp", "billing_bp", "sso_bp",
     "audit_bp", "webhooks_bp", "gdpr_bp", "plugins_bp", "im_channels_bp",
+    "chat_bp",
 ]

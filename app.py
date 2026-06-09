@@ -380,6 +380,9 @@ def run():
                     saas_app.register_blueprint(gdpr_bp, url_prefix="/api/gdpr")
                     saas_app.register_blueprint(im_channels_bp, url_prefix="/api/im-channels")
                     saas_app.register_blueprint(health_bp)
+                    # Chat 对话蓝图
+                    from saas.api.chat import chat_bp
+                    saas_app.register_blueprint(chat_bp, url_prefix="/api/chat")
                     # Prometheus 监控指标
                     try:
                         from saas.metrics import metrics_middleware, create_metrics_blueprint

@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+admin-panel/node_modules/
+
+# Logs
+run.log
+*.log
+
+# Environment
+.env
+.env.local
+
+# Vite cache
+admin-panel/.vite/
+
+# Data
+data/
+cow/

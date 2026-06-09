@@ -7,11 +7,11 @@ QIANFAN = "qianfan"
 XUNFEI = "xunfei"
 CHATGPTONAZURE = "chatGPTOnAzure"
 LINKAI = "linkai"
-CLAUDEAPI = "claudeAPI"
+CLAUDEAPI= "claudeAPI"
 QWEN = "qwen"  # 千问 (兼容旧配置，实际走 DashscopeBot)
 QWEN_DASHSCOPE = "dashscope"  # 千问 DashScope 接入
-GEMINI = "gemini"
-ZHIPU_AI = "zhipu"
+GEMINI = "gemini" 
+ZHIPU_AI = "zhipu"  
 MOONSHOT = "moonshot"
 MiniMax = "minimax"
 DEEPSEEK = "deepseek"
@@ -30,10 +30,10 @@ CLAUDE_35_SONNET = "claude-3-5-sonnet-latest"  # 带 latest 标签的模型名�
 CLAUDE_35_SONNET_1022 = "claude-3-5-sonnet-20241022"  # 带具体日期的模型名称，会固定为该日期发布的模型
 CLAUDE_35_SONNET_0620 = "claude-3-5-sonnet-20240620"
 CLAUDE_4_OPUS = "claude-opus-4-0"
-CLAUDE_4_8_OPUS = "claude-opus-4-8"  # Claude Opus 4.8 - Agent推荐模型
-CLAUDE_4_7_OPUS = "claude-opus-4-7"  # Claude Opus 4.7
-CLAUDE_4_6_OPUS = "claude-opus-4-6"  # Claude Opus 4.6
-CLAUDE_4_SONNET = "claude-sonnet-4-0"  # Claude Sonnet 4.0
+CLAUDE_4_8_OPUS = "claude-opus-4-8"      # Claude Opus 4.8 - Agent推荐模型
+CLAUDE_4_7_OPUS = "claude-opus-4-7"      # Claude Opus 4.7
+CLAUDE_4_6_OPUS = "claude-opus-4-6"      # Claude Opus 4.6
+CLAUDE_4_SONNET = "claude-sonnet-4-0"    # Claude Sonnet 4.0
 CLAUDE_4_5_SONNET = "claude-sonnet-4-5"  # Claude Sonnet 4.5 - Agent推荐模型
 CLAUDE_4_6_SONNET = "claude-sonnet-4-6"  # Claude Sonnet 4.6 - Agent推荐模型
 
@@ -108,6 +108,7 @@ QWEN_LONG = "qwen-long"
 QWEN3_MAX = "qwen3-max"  # Qwen3 Max - Agent推荐模型
 QWEN35_PLUS = "qwen3.5-plus"  # Qwen3.5 Plus - Omni model (MultiModalConversation)
 QWEN36_PLUS = "qwen3.6-plus"  # Qwen3.6 Plus - Omni model (MultiModalConversation)
+QWEN37_PLUS = "qwen3.7-plus"  # Qwen3.7 Plus - Omni model (MultiModalConversation)
 QWEN37_MAX = "qwen3.7-max"  # Qwen3.7 Max - Agent推荐模型
 QWQ_PLUS = "qwq-plus"
 
@@ -115,9 +116,6 @@ QWQ_PLUS = "qwq-plus"
 MINIMAX_M3 = "MiniMax-M3"  # MiniMax M3 - Latest (default)
 MINIMAX_M2_7 = "MiniMax-M2.7"  # MiniMax M2.7
 MINIMAX_M2_7_HIGHSPEED = "MiniMax-M2.7-highspeed"  # MiniMax M2.7 highspeed
-MINIMAX_M2_5 = "MiniMax-M2.5"  # MiniMax M2.5
-MINIMAX_M2_1 = "MiniMax-M2.1"  # MiniMax M2.1
-MINIMAX_M2_1_LIGHTNING = "MiniMax-M2.1-lightning"  # MiniMax M2.1 lightning
 MINIMAX_TEXT_01 = "MiniMax-Text-01"  # MiniMax 多模态 (vision)
 MINIMAX_ABAB6_5 = "abab6.5-chat"  # MiniMax abab6.5
 
@@ -143,11 +141,11 @@ KIMI_K2_5 = "kimi-k2.5"
 KIMI_K2_6 = "kimi-k2.6"  # Kimi K2.6 - Agent recommended model (default)
 
 # 小米 MiMo
-MIMO_V2_5_PRO = "mimo-v2.5-pro"  # MiMo V2.5 Pro - 旗舰，长上下文（默认推荐）
-MIMO_V2_5 = "mimo-v2.5"  # MiMo V2.5 - 多模态（文/图/音/视频）
-MIMO_V2_PRO = "mimo-v2-pro"  # MiMo V2 Pro
-MIMO_V2_OMNI = "mimo-v2-omni"  # MiMo V2 Omni - 多模态
-MIMO_V2_FLASH = "mimo-v2-flash"  # MiMo V2 Flash - 极速版
+MIMO_V2_5_PRO = "mimo-v2.5-pro"      # MiMo V2.5 Pro - 旗舰，长上下文（默认推荐）
+MIMO_V2_5 = "mimo-v2.5"              # MiMo V2.5 - 多模态（文/图/音/视频）
+MIMO_V2_PRO = "mimo-v2-pro"          # MiMo V2 Pro
+MIMO_V2_OMNI = "mimo-v2-omni"        # MiMo V2 Omni - 多模态
+MIMO_V2_FLASH = "mimo-v2-flash"      # MiMo V2 Flash - 极速版
 
 # Doubao (Volcengine Ark)
 DOUBAO = "doubao"
@@ -169,224 +167,73 @@ LINKAI_4_TURBO = "linkai-4-turbo"
 LINKAI_4o = "linkai-4o"
 MODELSCOPE = "modelscope"
 
-GITEE_AI_MODEL_LIST = [
-    "Yi-34B-Chat",
-    "InternVL2-8B",
-    "deepseek-coder-33B-instruct",
-    "InternVL2.5-26B",
-    "Qwen2-VL-72B",
-    "Qwen2.5-32B-Instruct",
-    "glm-4-9b-chat",
-    "codegeex4-all-9b",
-    "Qwen2.5-Coder-32B-Instruct",
-    "Qwen2.5-72B-Instruct",
-    "Qwen2.5-7B-Instruct",
-    "Qwen2-72B-Instruct",
-    "Qwen2-7B-Instruct",
-    "code-raccoon-v1",
-    "Qwen2.5-14B-Instruct",
-]
+GITEE_AI_MODEL_LIST = ["Yi-34B-Chat", "InternVL2-8B", "deepseek-coder-33B-instruct", "InternVL2.5-26B", "Qwen2-VL-72B", "Qwen2.5-32B-Instruct", "glm-4-9b-chat", "codegeex4-all-9b", "Qwen2.5-Coder-32B-Instruct", "Qwen2.5-72B-Instruct", "Qwen2.5-7B-Instruct", "Qwen2-72B-Instruct", "Qwen2-7B-Instruct", "code-raccoon-v1", "Qwen2.5-14B-Instruct"]
 
-MODELSCOPE_MODEL_LIST = [
-    "deepseek-ai/DeepSeek-R1-0528",
-    "deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
-    "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
-    "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
-    "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
-    "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
-    "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
-    "deepseek-ai/DeepSeek-V3.2",
-    "LLM-Research/c4ai-command-r-plus-08-2024",
-    "LLM-Research/Llama-4-Maverick-17B-128E-Instruct",
-    "meituan-longcat/LongCat-Flash-Lite",
-    "MiniMax/MiniMax-M1-80k",
-    "MiniMax/MiniMax-M2.5",
-    "mistralai/Ministral-8B-Instruct-2410",
-    "mistralai/Mistral-Large-Instruct-2407",
-    "mistralai/Mistral-Small-Instruct-2409",
-    "moonshotai/Kimi-K2.5",
-    "MusePublic/Qwen-Image-Edit",
-    "opencompass/CompassJudger-1-32B-Instruct",
-    "OpenGVLab/InternVL3_5-241B-A28B",
-    "Qwen/QVQ-72B-Preview",
-    "Qwen/Qwen-Image-Edit",
-    "Qwen/Qwen3-0.6B",
-    "Qwen/Qwen3-1.7B",
-    "Qwen/Qwen3-14B",
-    "Qwen/Qwen3-235B-A22B",
-    "Qwen/Qwen3-235B-A22B-Instruct-2507",
-    "Qwen/Qwen3-235B-A22B-Thinking-2507",
-    "Qwen/Qwen3-30B-A3B",
-    "Qwen/Qwen3-30B-A3B-Thinking-2507",
-    "Qwen/Qwen3-32B",
-    "Qwen/Qwen3-4B",
-    "Qwen/Qwen3-8B",
-    "Qwen/Qwen3-Coder-30B-A3B-Instruct",
-    "Qwen/Qwen3-Coder-480B-A35B-Instruct",
-    "Qwen/Qwen3-Next-80B-A3B-Instruct",
-    "Qwen/Qwen3-Next-80B-A3B-Thinking",
-    "Qwen/Qwen3-VL-235B-A22B-Instruct",
-    "Qwen/Qwen3-VL-8B-Instruct",
-    "Qwen/Qwen3-VL-8B-Thinking",
-    "Qwen/Qwen3.5-122B-A10B",
-    "Qwen/Qwen3.5-27B",
-    "Qwen/Qwen3.5-35B-A3B",
-    "Qwen/Qwen3.5-397B-A17B",
-    "Qwen/QwQ-32B",
-    "Qwen/QwQ-32B-Preview",
-    "Shanghai_AI_Laboratory/Intern-S1",
-    "Shanghai_AI_Laboratory/Intern-S1-mini",
-    "stepfun-ai/Step-3.5-Flash",
-    "XiaomiMiMo/MiMo-V2-Flash",
-    "ZhipuAI/GLM-4.7-Flash",
-    "ZhipuAI/GLM-5",
-]
+MODELSCOPE_MODEL_LIST = ["deepseek-ai/DeepSeek-R1-0528", "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", "deepseek-ai/DeepSeek-R1-Distill-Llama-8B", "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B", "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B", "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+                         "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B", "deepseek-ai/DeepSeek-V3.2", "LLM-Research/c4ai-command-r-plus-08-2024", "LLM-Research/Llama-4-Maverick-17B-128E-Instruct", "meituan-longcat/LongCat-Flash-Lite", "MiniMax/MiniMax-M1-80k", "MiniMax/MiniMax-M2.5", "mistralai/Ministral-8B-Instruct-2410",
+                         "mistralai/Mistral-Large-Instruct-2407", "mistralai/Mistral-Small-Instruct-2409", "moonshotai/Kimi-K2.5", "MusePublic/Qwen-Image-Edit", "opencompass/CompassJudger-1-32B-Instruct", "OpenGVLab/InternVL3_5-241B-A28B",
+                         "Qwen/QVQ-72B-Preview", "Qwen/Qwen-Image-Edit", "Qwen/Qwen3-0.6B", "Qwen/Qwen3-1.7B", "Qwen/Qwen3-14B", "Qwen/Qwen3-235B-A22B", "Qwen/Qwen3-235B-A22B-Instruct-2507", "Qwen/Qwen3-235B-A22B-Thinking-2507", "Qwen/Qwen3-30B-A3B", "Qwen/Qwen3-30B-A3B-Thinking-2507",
+                         "Qwen/Qwen3-32B", "Qwen/Qwen3-4B", "Qwen/Qwen3-8B", "Qwen/Qwen3-Coder-30B-A3B-Instruct", "Qwen/Qwen3-Coder-480B-A35B-Instruct", "Qwen/Qwen3-Next-80B-A3B-Instruct", "Qwen/Qwen3-Next-80B-A3B-Thinking", "Qwen/Qwen3-VL-235B-A22B-Instruct", "Qwen/Qwen3-VL-8B-Instruct",
+                         "Qwen/Qwen3-VL-8B-Thinking", "Qwen/Qwen3.5-122B-A10B", "Qwen/Qwen3.5-27B", "Qwen/Qwen3.5-35B-A3B", "Qwen/Qwen3.5-397B-A17B", "Qwen/QwQ-32B", "Qwen/QwQ-32B-Preview", "Shanghai_AI_Laboratory/Intern-S1", "Shanghai_AI_Laboratory/Intern-S1-mini",
+                         "stepfun-ai/Step-3.5-Flash", "XiaomiMiMo/MiMo-V2-Flash", "ZhipuAI/GLM-4.7-Flash", "ZhipuAI/GLM-5"]
 
 
 MODEL_LIST = [
-    # DeepSeek
-    DEEPSEEK_V4_FLASH,
-    DEEPSEEK_V4_PRO,
-    DEEPSEEK_CHAT,
-    DEEPSEEK_REASONER,
-    # Baidu Qianfan / ERNIE
-    QIANFAN,
-    ERNIE_5_1,
-    ERNIE_5,
-    ERNIE_X1_1,
-    ERNIE_45_TURBO_128K,
-    ERNIE_45_TURBO_32K,
-    ERNIE_4_TURBO_8K,
-    ERNIE_45_TURBO_VL,
-    ERNIE_45_TURBO_VL_32K,
-    # MiniMax
-    MiniMax,
-    MINIMAX_M3,
-    MINIMAX_M2_7,
-    MINIMAX_M2_7_HIGHSPEED,
-    MINIMAX_M2_5,
-    MINIMAX_M2_1,
-    MINIMAX_M2_1_LIGHTNING,
-    MINIMAX_ABAB6_5,
-    # 小米 MiMo
-    MIMO,
-    MIMO_V2_5_PRO,
-    MIMO_V2_5,
-    MIMO_V2_PRO,
-    MIMO_V2_OMNI,
-    MIMO_V2_FLASH,
-    # Claude
-    CLAUDE3,
-    CLAUDE_4_8_OPUS,
-    CLAUDE_4_7_OPUS,
-    CLAUDE_4_6_SONNET,
-    CLAUDE_4_6_OPUS,
-    CLAUDE_4_OPUS,
-    CLAUDE_4_5_SONNET,
-    CLAUDE_4_SONNET,
-    CLAUDE_3_OPUS,
-    CLAUDE_3_OPUS_0229,
-    CLAUDE_35_SONNET,
-    CLAUDE_35_SONNET_1022,
-    CLAUDE_35_SONNET_0620,
-    CLAUDE_3_SONNET,
-    CLAUDE_3_HAIKU,
-    "claude",
-    "claude-3-haiku",
-    "claude-3-sonnet",
-    "claude-3-opus",
-    "claude-3.5-sonnet",
-    # Gemini
-    GEMINI_35_FLASH,
-    GEMINI_31_FLASH_LITE_PRE,
-    GEMINI_31_PRO_PRE,
-    GEMINI_3_PRO_PRE,
-    GEMINI_3_FLASH_PRE,
-    GEMINI_25_PRO_PRE,
-    GEMINI_25_FLASH_PRE,
-    GEMINI_20_FLASH,
-    GEMINI_20_flash_exp,
-    GEMINI_15_PRO,
-    GEMINI_15_flash,
-    GEMINI_PRO,
-    GEMINI,
-    # OpenAI
-    GPT35,
-    GPT35_0125,
-    GPT35_1106,
-    "gpt-3.5-turbo-16k",
-    GPT4,
-    GPT4_06_13,
-    GPT4_32k,
-    GPT4_32k_06_13,
-    GPT4_TURBO,
-    GPT4_TURBO_PREVIEW,
-    GPT4_TURBO_01_25,
-    GPT4_TURBO_11_06,
-    GPT4_TURBO_04_09,
-    GPT_4o,
-    GPT_4O_0806,
-    GPT_4o_MINI,
-    GPT_41,
-    GPT_41_MINI,
-    GPT_41_NANO,
-    GPT_5,
-    GPT_5_MINI,
-    GPT_5_NANO,
-    GPT_54,
-    GPT_55,
-    GPT_54_MINI,
-    GPT_54_NANO,
-    O1,
-    O1_MINI,
-    # GLM (智谱AI)
-    ZHIPU_AI,
-    GLM_5_1,
-    GLM_5_TURBO,
-    GLM_5,
-    GLM_4,
-    GLM_4_PLUS,
-    GLM_4_flash,
-    GLM_4_LONG,
-    GLM_4_ALLTOOLS,
-    GLM_4_0520,
-    GLM_4_AIR,
-    GLM_4_AIRX,
-    GLM_4_7,
-    # Qwen (通义千问)
-    QWEN37_MAX,
-    QWEN36_PLUS,
-    QWEN35_PLUS,
-    QWEN3_MAX,
-    QWEN_MAX,
-    QWEN_PLUS,
-    QWEN_TURBO,
-    QWEN_LONG,
-    # Doubao (豆包)
-    DOUBAO,
-    DOUBAO_SEED_2_CODE,
-    DOUBAO_SEED_2_PRO,
-    DOUBAO_SEED_2_LITE,
-    DOUBAO_SEED_2_MINI,
-    # Kimi (Moonshot)
-    MOONSHOT,
-    "moonshot-v1-8k",
-    "moonshot-v1-32k",
-    "moonshot-v1-128k",
-    KIMI_K2_6,
-    KIMI_K2_5,
-    KIMI_K2,
-    # ModelScope
-    MODELSCOPE,
-    # LinkAI
-    LINKAI_35,
-    LINKAI_4_TURBO,
-    LINKAI_4o,
-    # 其他模型
-    WEN_XIN,
-    WEN_XIN_4,
-    XUNFEI,
-]
+              # DeepSeek
+              DEEPSEEK_V4_FLASH, DEEPSEEK_V4_PRO, DEEPSEEK_CHAT, DEEPSEEK_REASONER,
+
+              # Baidu Qianfan / ERNIE
+              QIANFAN, ERNIE_5_1, ERNIE_5, ERNIE_X1_1, ERNIE_45_TURBO_128K, ERNIE_45_TURBO_32K, ERNIE_4_TURBO_8K,
+              ERNIE_45_TURBO_VL, ERNIE_45_TURBO_VL_32K,
+
+              # MiniMax
+              MiniMax, MINIMAX_M3, MINIMAX_M2_7, MINIMAX_M2_7_HIGHSPEED, MINIMAX_ABAB6_5,
+
+              # 小米 MiMo
+              MIMO, MIMO_V2_5_PRO, MIMO_V2_5, MIMO_V2_PRO, MIMO_V2_OMNI, MIMO_V2_FLASH,
+
+              # Claude
+              CLAUDE3, CLAUDE_4_8_OPUS, CLAUDE_4_7_OPUS, CLAUDE_4_6_SONNET, CLAUDE_4_6_OPUS, CLAUDE_4_OPUS, CLAUDE_4_5_SONNET, CLAUDE_4_SONNET, CLAUDE_3_OPUS, CLAUDE_3_OPUS_0229,
+              CLAUDE_35_SONNET, CLAUDE_35_SONNET_1022, CLAUDE_35_SONNET_0620, CLAUDE_3_SONNET, CLAUDE_3_HAIKU,
+              "claude", "claude-3-haiku", "claude-3-sonnet", "claude-3-opus", "claude-3.5-sonnet",
+
+              # Gemini
+              GEMINI_35_FLASH, GEMINI_31_FLASH_LITE_PRE, GEMINI_31_PRO_PRE, GEMINI_3_PRO_PRE, GEMINI_3_FLASH_PRE, GEMINI_25_PRO_PRE, GEMINI_25_FLASH_PRE,
+              GEMINI_20_FLASH, GEMINI_20_flash_exp, GEMINI_15_PRO, GEMINI_15_flash, GEMINI_PRO, GEMINI,
+
+              # OpenAI
+              GPT35, GPT35_0125, GPT35_1106, "gpt-3.5-turbo-16k",
+              GPT4, GPT4_06_13, GPT4_32k, GPT4_32k_06_13,
+              GPT4_TURBO, GPT4_TURBO_PREVIEW, GPT4_TURBO_01_25, GPT4_TURBO_11_06, GPT4_TURBO_04_09,
+              GPT_4o, GPT_4O_0806, GPT_4o_MINI,
+              GPT_41, GPT_41_MINI, GPT_41_NANO,
+              GPT_5, GPT_5_MINI, GPT_5_NANO,
+              GPT_54, GPT_55, GPT_54_MINI, GPT_54_NANO,
+              O1, O1_MINI,
+
+              # GLM (智谱AI)
+              ZHIPU_AI, GLM_5_1, GLM_5_TURBO, GLM_5, GLM_4, GLM_4_PLUS, GLM_4_flash, GLM_4_LONG, GLM_4_ALLTOOLS,
+              GLM_4_0520, GLM_4_AIR, GLM_4_AIRX, GLM_4_7,
+
+              # Qwen (通义千问)
+              QWEN37_PLUS, QWEN37_MAX, QWEN36_PLUS, QWEN35_PLUS, QWEN3_MAX, QWEN_MAX, QWEN_PLUS, QWEN_TURBO, QWEN_LONG,
+
+              # Doubao (豆包)
+              DOUBAO, DOUBAO_SEED_2_CODE, DOUBAO_SEED_2_PRO, DOUBAO_SEED_2_LITE, DOUBAO_SEED_2_MINI,
+
+              # Kimi (Moonshot)
+              MOONSHOT, "moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k",
+              KIMI_K2_6, KIMI_K2_5, KIMI_K2,
+
+              # ModelScope
+              MODELSCOPE,
+
+              # LinkAI
+              LINKAI_35, LINKAI_4_TURBO, LINKAI_4o,
+
+              # 其他模型
+              WEN_XIN, WEN_XIN_4, XUNFEI,
+            ]
 
 MODEL_LIST = MODEL_LIST + GITEE_AI_MODEL_LIST + MODELSCOPE_MODEL_LIST
 # channel

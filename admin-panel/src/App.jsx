@@ -9,8 +9,9 @@ import {
   MessageOutlined,
   LinkOutlined,
   FileSearchOutlined,
+  CommentOutlined,
 } from '@ant-design/icons';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -20,12 +21,14 @@ import Settings from './pages/Settings';
 import ImChannels from './pages/ImChannels';
 import Webhooks from './pages/Webhooks';
 import AuditLogs from './pages/AuditLogs';
+import Chat from './pages/Chat';
 
 const { Header, Sider, Content } = Layout;
 const { Title } = Typography;
 
 // 菜单项配置
 const menuItems = [
+  { key: '/chat', icon: <CommentOutlined />, label: 'AI 对话' },
   { key: '/dashboard', icon: <DashboardOutlined />, label: '仪表盘' },
   { key: '/api-keys', icon: <KeyOutlined />, label: 'API 密钥' },
   { key: '/usage', icon: <BarChartOutlined />, label: '用量统计' },
@@ -36,14 +39,14 @@ const menuItems = [
 ];
 
 // 主布局组件，包含侧边栏和顶部导航
-function MainLayout() {
+function MainLayout({ onLogout }) {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   // 退出登录：清除本地存储的API Key并跳转到登录页
   const handleLogout = () => {
-    localStorage.removeItem('api_key');
+    onLogout();
     navigate('/login');
   };
 
@@ -91,6 +94,7 @@ function MainLayout() {
         </Header>
         <Content style={{ margin: 24 }}>
           <Routes>
+            <Route path="/chat" element={<Chat />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/api-keys" element={<ApiKeys />} />
             <Route path="/usage" element={<Usage />} />
@@ -107,17 +111,27 @@ function MainLayout() {
 
 // 根组件：根据是否已登录决定显示登录页还是主布局
 export default function App() {
-  const apiKey = localStorage.getItem('api_key');
+  const [apiKey, setApiKey] = useState(localStorage.getItem('api_key'));
+
+  const handleLogin = useCallback((key) => {
+    localStorage.setItem('api_key', key);
+    setApiKey(key);
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('api_key');
+    setApiKey(null);
+  }, []);
 
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
+      <Route path="/login" element={<Login onLogin={handleLogin} />} />
       {/* 已登录时访问根路径跳转到仪表盘 */}
       <Route
         path="/"
         element={
           apiKey ? (
-            <Navigate to="/dashboard" replace />
+            <Navigate to="/chat" replace />
           ) : (
             <Navigate to="/login" replace />
           )
@@ -128,7 +142,7 @@ export default function App() {
         path="/*"
         element={
           apiKey ? (
-            <MainLayout />
+            <MainLayout onLogout={handleLogout} />
           ) : (
             <Navigate to="/login" replace />
           )

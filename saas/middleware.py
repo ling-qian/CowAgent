@@ -178,11 +178,18 @@ class TenantMiddleware:
 
     def _before_request(self):
         from flask import request, g
-        from config import conf
-        if not conf().get("saas_mode", False):
+        import os
+        saas_mode = os.environ.get("SAAS_MODE", "").lower() in ("true", "1", "yes")
+        if not saas_mode:
+            try:
+                from config import conf
+                saas_mode = conf().get("saas_mode", False)
+            except Exception:
+                pass
+        if not saas_mode:
             return None
 
-        if request.path.startswith("/health") or request.path.startswith("/static"):
+        if request.path.startswith("/health") or request.path.startswith("/static") or request.path.startswith("/debug") or request.path == "/" or request.path.startswith("/apidocs") or request.path.startswith("/flasgger") or request.path.startswith("/apispec") or request.path.startswith("/oauth2-redirect"):
             return None
 
         tenant_id = None

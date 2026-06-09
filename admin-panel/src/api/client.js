@@ -121,4 +121,26 @@ export async function getAuditLogs(params) {
   return client.get('/audit', { params });
 }
 
+// --- 对话相关 ---
+
+// 发送消息（非流式）
+export async function sendChatMessage({ message, session_id, system_prompt }) {
+  return client.post('/chat/completions', { message, session_id, system_prompt });
+}
+
+// 获取会话列表
+export async function getChatSessions() {
+  return client.get('/chat/sessions');
+}
+
+// 清除会话
+export async function clearChatSession(sessionId) {
+  return client.delete(`/chat/sessions/${sessionId}`);
+}
+
+// 获取可用模型
+export async function getChatModels() {
+  return client.get('/chat/models');
+}
+
 export default client;

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CowAgent SaaS 平台 - 系统架构流程图</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; padding: 40px 20px; }
+  h1 { text-align: center; font-size: 2rem; margin-bottom: 8px; background: linear-gradient(135deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .subtitle { text-align: center; color: #94a3b8; margin-bottom: 40px; font-size: 0.95rem; }
+  .flow-container { max-width: 1200px; margin: 0 auto; }
+  .layer { margin-bottom: 32px; position: relative; }
+  .layer-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 2px; color: #64748b; margin-bottom: 12px; border-left: 3px solid #334155; padding-left: 12px; }
+  .node-row { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+  .node { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 16px 20px; min-width: 160px; text-align: center; transition: all 0.2s; }
+  .node:hover { border-color: #38bdf8; transform: translateY(-2px); box-shadow: 0 4px 20px rgba(56, 189, 248, 0.15); }
+  .node .icon { font-size: 1.8rem; margin-bottom: 8px; }
+  .node .title { font-weight: 600; font-size: 0.9rem; margin-bottom: 4px; }
+  .node .desc { font-size: 0.75rem; color: #94a3b8; line-height: 1.4; }
+  .node.client { border-color: #22c55e44; }
+  .node.client:hover { border-color: #22c55e; box-shadow: 0 4px 20px rgba(34, 197, 94, 0.15); }
+  .node.frontend { border-color: #818cf844; }
+  .node.frontend:hover { border-color: #818cf8; box-shadow: 0 4px 20px rgba(129, 140, 248, 0.15); }
+  .node.gateway { border-color: #f59e0b44; }
+  .node.gateway:hover { border-color: #f59e0b; box-shadow: 0 4px 20px rgba(245, 158, 11, 0.15); }
+  .node.service { border-color: #38bdf844; }
+  .node.service:hover { border-color: #38bdf8; box-shadow: 0 4px 20px rgba(56, 189, 248, 0.15); }
+  .node.data { border-color: #f472b644; }
+  .node.data:hover { border-color: #f472b6; box-shadow: 0 4px 20px rgba(244, 114, 182, 0.15); }
+  .node.infra { border-color: #a78bfa44; }
+  .node.infra:hover { border-color: #a78bfa; box-shadow: 0 4px 20px rgba(167, 139, 250, 0.15); }
+  .arrow-down { text-align: center; color: #475569; font-size: 1.5rem; margin: 8px 0; letter-spacing: 20px; }
+  .arrow-label { font-size: 0.7rem; color: #64748b; text-align: center; margin: 2px 0 8px; }
+  .flow-section { background: #1e293b22; border: 1px solid #33415544; border-radius: 16px; padding: 24px; margin-bottom: 24px; }
+  .flow-section h3 { font-size: 1rem; color: #38bdf8; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .flow-section h3 .badge { background: #38bdf822; color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; }
+  .legend { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-bottom: 32px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #94a3b8; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .seq-container { max-width: 1100px; margin: 0 auto; overflow-x: auto; }
+  .seq-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  .seq-table th { background: #1e293b; color: #94a3b8; padding: 10px 8px; text-align: center; border: 1px solid #334155; font-weight: 600; white-space: nowrap; }
+  .seq-table td { padding: 8px; text-align: center; border: 1px solid #33415544; vertical-align: middle; }
+  .seq-table .arrow-cell { color: #38bdf8; font-weight: 600; white-space: nowrap; }
+  .seq-table .highlight { background: #38bdf811; }
+  .flow-step { background: #1e293b; display: inline-block; padding: 8px 20px; border-radius: 8px; border: 1px solid #334155; }
+  .flow-step.auth { border-color: #f59e0b44; }
+  .flow-step.create { border-color: #38bdf844; }
+  .flow-step.key { border-color: #f472b644; }
+  .flow-step.result { border-color: #22c55e44; }
+  .flow-step.output { border-color: #818cf844; }
+  .flow-arrow { color: #475569; text-align: center; margin: 4px 0; }
+  .flow-flex { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+  .isolation-card { background: #1e293b; padding: 16px; border-radius: 12px; border: 1px solid #334155; }
+  .isolation-card .label { font-weight: 600; margin-bottom: 8px; }
+  .isolation-card .content { font-size: 0.8rem; color: #94a3b8; line-height: 1.6; }
+  .deploy-card { background: #1e293b; padding: 16px 24px; border-radius: 12px; border: 1px solid #a78bfa44; min-width: 200px; }
+  .deploy-card .label { color: #a78bfa; font-weight: 600; margin-bottom: 8px; }
+  .deploy-card .content { font-size: 0.8rem; color: #94a3b8; line-height: 1.6; }
+  .screenshots { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 16px; }
+  .screenshot-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; overflow: hidden; transition: all 0.2s; }
+  .screenshot-card:hover { border-color: #38bdf8; transform: translateY(-2px); }
+  .screenshot-card img { width: 100%; display: block; }
+  .screenshot-card .caption { padding: 10px 14px; font-size: 0.8rem; color: #94a3b8; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>CowAgent SaaS 平台</h1>
+<p class="subtitle">系统架构与数据流程图</p>
+
+<div class="flow-container">
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>客户端</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#818cf8"></div>前端</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>网关/中间件</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div>业务服务</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f472b6"></div>数据层</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#a78bfa"></div>基础设施</div>
+</div>
+
+<!-- 1. 整体架构 -->
+<div class="flow-section">
+  <h3>1. 整体架构 <span class="badge">分层视图</span></h3>
+  <div class="layer">
+    <div class="layer-label">客户端层 Client Layer</div>
+    <div class="node-row">
+      <div class="node client"><div class="icon">🌐</div><div class="title">Admin 管理面板</div><div class="desc">React + Ant Design<br>localhost:3001</div></div>
+      <div class="node client"><div class="icon">💬</div><div class="title">IM 渠道</div><div class="desc">微信/飞书/钉钉<br>Telegram/Slack</div></div>
+      <div class="node client"><div class="icon">🔌</div><div class="title">API 调用方</div><div class="desc">第三方应用<br>curl / SDK</div></div>
+    </div>
+  </div>
+  <div class="arrow-down">↓ ↑</div>
+  <div class="arrow-label">HTTP / WebSocket</div>
+  <div class="layer">
+    <div class="layer-label">网关层 Gateway Layer</div>
+    <div class="node-row">
+      <div class="node gateway"><div class="icon">🛡️</div><div class="title">TenantMiddleware</div><div class="desc">API Key 认证<br>租户身份识别</div></div>
+      <div class="node gateway"><div class="icon">⏱️</div><div class="title">RateLimitMiddleware</div><div class="desc">请求限流<br>配额控制</div></div>
+      <div class="node gateway"><div class="icon">📋</div><div class="title">CORS</div><div class="desc">跨域策略<br>Vite Proxy</div></div>
+    </div>
+  </div>
+  <div class="arrow-down">↓ ↑</div>
+  <div class="arrow-label">Flask Blueprint Routing</div>
+  <div class="layer">
+    <div class="layer-label">业务服务层 Service Layer</div>
+    <div class="node-row">
+      <div class="node service"><div class="icon">🏢</div><div class="title">Tenants</div><div class="desc">租户注册/管理<br>/api/tenants</div></div>
+      <div class="node service"><div class="icon">🔑</div><div class="title">API Keys</div><div class="desc">密钥创建/撤销<br>/api/keys</div></div>
+      <div class="node service"><div class="icon">📊</div><div class="title">Usage</div><div class="desc">用量统计<br>/api/usage</div></div>
+      <div class="node service"><div class="icon">💳</div><div class="title">Billing</div><div class="desc">计费/配额<br>/api/billing</div></div>
+      <div class="node service"><div class="icon">🔗</div><div class="title">Webhooks</div><div class="desc">事件回调<br>/api/webhooks</div></div>
+      <div class="node service"><div class="icon">📨</div><div class="title">IM Channels</div><div class="desc">渠道映射<br>/api/im-channels</div></div>
+      <div class="node service"><div class="icon">📝</div><div class="title">Audit</div><div class="desc">审计日志<br>/api/audit</div></div>
+      <div class="node service"><div class="icon">🤖</div><div class="title">CowAgent Core</div><div class="desc">AI Agent 引擎<br>多轮对话/工具调用</div></div>
+    </div>
+  </div>
+  <div class="arrow-down">↓ ↑</div>
+  <div class="arrow-label">SQLAlchemy ORM</div>
+  <div class="layer">
+    <div class="layer-label">数据层 Data Layer</div>
+    <div class="node-row">
+      <div class="node data"><div class="icon">🐘</div><div class="title">PostgreSQL</div><div class="desc">租户/密钥/用量<br>Neon / 本地</div></div>
+      <div class="node data"><div class="icon">🧮</div><div class="title">pgvector</div><div class="desc">向量存储<br>知识库嵌入</div></div>
+      <div class="node data"><div class="icon">📁</div><div class="title">Workspace</div><div class="desc">文件存储<br>/data 或本地</div></div>
+    </div>
+  </div>
+  <div class="arrow-down">↓ ↑</div>
+  <div class="layer">
+    <div class="layer-label">基础设施层 Infrastructure Layer</div>
+    <div class="node-row">
+      <div class="node infra"><div class="icon">🤗</div><div class="title">HF Spaces</div><div class="desc">Docker 托管<br>端口 7860</div></div>
+      <div class="node infra"><div class="icon">💚</div><div class="title">Neon DB</div><div class="desc">Serverless PG<br>免费额度</div></div>
+      <div class="node infra"><div class="icon">🐙</div><div class="title">GitHub</div><div class="desc">代码仓库<br>CI/CD</div></div>
+      <div class="node infra"><div class="icon">🐳</div><div class="title">Docker</div><div class="desc">容器化部署<br>Dockerfile.hf</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 2. API 请求认证流程 -->
+<div class="flow-section">
+  <h3>2. API 请求认证流程 <span class="badge">时序图</span></h3>
+  <div class="seq-container">
+    <table class="seq-table">
+      <thead>
+        <tr><th>客户端</th><th></th><th>Vite Proxy</th><th></th><th>Flask API</th><th></th><th>Middleware</th><th></th><th>Database</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>携带 X-API-Key 发起请求</td><td class="arrow-cell">→</td><td>代理 /api → :8081</td><td class="arrow-cell">→</td><td class="highlight">before_request</td><td class="arrow-cell">→</td><td>检查 SAAS_MODE</td><td></td><td></td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td>白名单路径？</td><td class="arrow-cell">→ YES</td><td>跳过认证</td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td>读取 X-API-Key</td><td class="arrow-cell">→</td><td>SHA256 哈希查询</td></tr>
+        <tr><td></td><td></td><td></td><td></td><td></td><td></td><td>设置 g.tenant_id</td><td class="arrow-cell">←</td><td>返回租户信息</td></tr>
+        <tr><td></td><td></td><td></td><td></td><td class="highlight">路由处理函数</td><td></td><td>限流检查</td><td></td><td></td></tr>
+        <tr><td>接收 JSON 响应</td><td class="arrow-cell">←</td><td>转发响应</td><td class="arrow-cell">←</td><td>返回结果</td><td></td><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 3. 租户注册流程 -->
+<div class="flow-section">
+  <h3>3. 租户注册流程 <span class="badge">流程图</span></h3>
+  <div style="text-align:center; font-size:0.85rem; line-height:2.2; color:#cbd5e1;">
+    <div class="flow-step">管理员调用 POST /api/tenants/register<br>携带 X-Admin-Secret + 租户信息</div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step auth">验证 Admin Secret</div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-flex">
+      <div class="flow-step create">创建 Tenant 记录<br>(name, slug, plan)</div>
+      <div class="flow-step create">创建 User 记录<br>(email, role=owner)</div>
+    </div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step key">生成 API Key<br>sk-{random32hex}</div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step result">SHA256 哈希后存入 api_keys 表<br>返回明文 Key（仅此一次）</div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step output">返回 {api_key, tenant, user}</div>
+  </div>
+</div>
+
+<!-- 4. AI Agent 对话流程 -->
+<div class="flow-section">
+  <h3>4. AI Agent 对话流程 <span class="badge">核心链路</span></h3>
+  <div style="text-align:center; font-size:0.85rem; line-height:2.2; color:#cbd5e1;">
+    <div class="flow-step">用户发送消息<br>(IM渠道 / Web / API)</div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step auth">Channel 适配器<br>统一消息格式</div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step create">Bridge 桥接层<br>上下文管理 / 记忆检索</div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-flex">
+      <div class="flow-step create">LLM 调用<br>(DeepSeek/OpenAI)</div>
+      <div class="flow-step create">工具调用<br>(Bash/Browser/Search)</div>
+      <div class="flow-step create">知识库检索<br>(pgvector)</div>
+    </div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step key">多步推理循环<br>(max_steps=20)</div>
+    <div class="flow-arrow">↓</div>
+    <div class="flow-step result">回复用户 + 记录用量<br>Webhook 事件通知</div>
+  </div>
+</div>
+
+<!-- 5. 多租户隔离 -->
+<div class="flow-section">
+  <h3>5. 多租户数据隔离 <span class="badge">安全模型</span></h3>
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px;">
+    <div class="isolation-card">
+      <div class="label" style="color:#38bdf8;">🔐 认证隔离</div>
+      <div class="content">每个请求通过 API Key 识别租户<br>g.tenant_id 贯穿请求生命周期<br>无 Key → 401 Missing tenant auth</div>
+    </div>
+    <div class="isolation-card">
+      <div class="label" style="color:#f59e0b;">📊 数据隔离</div>
+      <div class="content">所有查询自动添加 tenant_id 过滤<br>API Key 绑定租户<br>无法跨租户访问数据</div>
+    </div>
+    <div class="isolation-card">
+      <div class="label" style="color:#22c55e;">⏱️ 限流隔离</div>
+      <div class="content">每租户独立限流计数<br>Free/Pro/Enterprise 不同配额<br>超限返回 429 Too Many Requests</div>
+    </div>
+    <div class="isolation-card">
+      <div class="label" style="color:#f472b6;">📝 审计隔离</div>
+      <div class="content">每租户独立审计日志<br>记录所有敏感操作<br>支持 GDPR 数据导出/删除</div>
+    </div>
+  </div>
+</div>
+
+<!-- 6. 部署架构 -->
+<div class="flow-section">
+  <h3>6. 部署架构 <span class="badge">免费方案</span></h3>
+  <div style="text-align:center;">
+    <div class="flow-flex" style="align-items:center;">
+      <div class="deploy-card">
+        <div class="label">🐙 GitHub</div>
+        <div class="content">代码仓库<br>ling-qian/CowAgent<br>自动推送</div>
+      </div>
+      <div style="color:#475569; font-size:1.5rem;">→</div>
+      <div class="deploy-card">
+        <div class="label">🤗 HF Spaces</div>
+        <div class="content">Docker 容器运行<br>端口 7860<br>hf_spaces_app.py 入口</div>
+      </div>
+      <div style="color:#475569; font-size:1.5rem;">→</div>
+      <div class="deploy-card">
+        <div class="label">💚 Neon</div>
+        <div class="content">Serverless PostgreSQL<br>pgvector 扩展<br>免费额度 0.5GB</div>
+      </div>
+    </div>
+    <div style="margin-top:16px; font-size:0.8rem; color:#64748b;">
+      线上地址: https://chace01-cowagent-saas.hf.space
+    </div>
+  </div>
+</div>
+
+<!-- 7. 前端界面截图 -->
+<div class="flow-section">
+  <h3>7. 前端界面 <span class="badge">Admin 管理面板</span></h3>
+  <div class="screenshots">
+    <div class="screenshot-card">
+      <img src="cowagent-login.png" alt="登录页">
+      <div class="caption">登录页 - API Key 认证</div>
+    </div>
+    <div class="screenshot-card">
+      <img src="cowagent-dashboard.png" alt="仪表盘">
+      <div class="caption">仪表盘 - 租户概览</div>
+    </div>
+    <div class="screenshot-card">
+      <img src="cowagent-apikeys.png" alt="API密钥">
+      <div class="caption">API 密钥管理</div>
+    </div>
+    <div class="screenshot-card">
+      <img src="cowagent-usage.png" alt="用量统计">
+      <div class="caption">用量统计</div>
+    </div>
+    <div class="screenshot-card">
+      <img src="cowagent-imchannels.png" alt="IM渠道">
+      <div class="caption">IM 渠道映射</div>
+    </div>
+    <div class="screenshot-card">
+      <img src="cowagent-webhooks.png" alt="Webhook">
+      <div class="caption">Webhook 管理</div>
+    </div>
+    <div class="screenshot-card">
+      <img src="cowagent-audit.png" alt="审计日志">
+      <div class="caption">审计日志</div>
+    </div>
+    <div class="screenshot-card">
+      <img src="cowagent-settings.png" alt="设置">
+      <div class="caption">租户设置</div>
+    </div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>
