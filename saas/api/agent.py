@@ -28,7 +28,6 @@ def _serialize_config(config: AgentConfig) -> dict:
     tenant_plan = tenant.plan if tenant else "free"
     return {
         "id": config.id,
-        "tenant_id": config.tenant_id,
         "name": config.name,
         "avatar_url": config.avatar_url,
         "description": config.description,
@@ -88,6 +87,20 @@ def update_config():
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
+
+    # 输入验证
+    if "temperature" in data:
+        t = data["temperature"]
+        if not isinstance(t, (int, float)) or t < 0 or t > 2:
+            return jsonify({"error": "temperature must be a number between 0 and 2"}), 400
+    if "max_steps" in data:
+        ms = data["max_steps"]
+        if not isinstance(ms, int) or ms < 1 or ms > 50:
+            return jsonify({"error": "max_steps must be an integer between 1 and 50"}), 400
+    if "name" in data and (not isinstance(data["name"], str) or len(data["name"]) > 100):
+        return jsonify({"error": "name must be a string (max 100 chars)"}), 400
+    if "system_prompt" in data and (not isinstance(data["system_prompt"], str) or len(data["system_prompt"]) > 50000):
+        return jsonify({"error": "system_prompt must be a string (max 50000 chars)"}), 400
 
     config = AgentConfig.query.filter_by(tenant_id=tenant_id).first()
     if not config:

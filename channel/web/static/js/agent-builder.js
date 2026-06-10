@@ -16,17 +16,36 @@ const AB = {
     toolLimit: 0,       // 自定义工具限制
     editingToolId: null,// 正在编辑的工具 ID
     activeTab: 'basic', // 当前 Tab
+    _initialized: false,// 防止重复绑定事件
+    _saving: false,     // 防止重复提交
+    _pluginsLoaded: false, // 插件是否已加载
 };
 
 // ---------------------------------------------------------------------------
 // API Helpers
 // ---------------------------------------------------------------------------
 
-/** HTML 转义，防止 XSS */
+/** HTML 属性值转义（处理 <, >, &, ", '） */
+function abEscAttr(str) {
+    return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/** HTML 内容转义 */
 function abEsc(str) {
     const d = document.createElement('div');
     d.textContent = String(str ?? '');
     return d.innerHTML;
+}
+
+/** 校验 CSS class 名安全（只允许字母数字下划线空格和连字符） */
+function abSafeClass(str) {
+    const safe = String(str ?? '').replace(/[^a-zA-Z0-9_\- ]/g, '');
+    return safe || 'fas fa-puzzle-piece';
 }
 
 /** 显示 toast 通知 */
@@ -35,9 +54,11 @@ function abToast(msg, type = 'error') {
     if (!container) {
         container = document.createElement('div');
         container.id = 'ab-toast-container';
-        container.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;';
+        container.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-height:200px;overflow:hidden;';
         document.body.appendChild(container);
     }
+    // 最多显示 3 个 toast
+    while (container.children.length >= 3) container.firstChild.remove();
     const colors = type === 'success'
         ? 'bg-green-500 text-white'
         : 'bg-red-500 text-white';
@@ -83,7 +104,7 @@ function abSwitchTab(tab) {
     const panel = document.getElementById(`ab-panel-${tab}`);
     if (panel) panel.classList.remove('hidden');
     // Lazy load data
-    if (tab === 'plugins' && AB.plugins.length === 0) abLoadPlugins();
+    if (tab === 'plugins' && !AB._pluginsLoaded) abLoadPlugins();
     if (tab === 'knowledge') abLoadKnowledge();
     if (tab === 'tools') abLoadTools();
 }
@@ -110,6 +131,7 @@ async function abLoadConfig() {
         el('ab-plan-badge').textContent = AB.plan.toUpperCase();
     } catch (e) {
         console.error('[AB] Load config failed:', e);
+        abToast('加载配置失败: ' + e.message);
     }
 }
 
@@ -118,6 +140,8 @@ async function abLoadConfig() {
 // ---------------------------------------------------------------------------
 
 async function abSaveConfig() {
+    if (AB._saving) return;
+    AB._saving = true;
     const el = (id) => document.getElementById(id);
     const payload = {
         name: el('ab-name').value.trim(),
@@ -135,6 +159,8 @@ async function abSaveConfig() {
         abShowSaveStatus('已保存');
     } catch (e) {
         abToast('保存失败: ' + e.message);
+    } finally {
+        AB._saving = false;
     }
 }
 
@@ -172,6 +198,7 @@ async function abLoadPlugins() {
             }
         }
         AB.plugins = allPlugins;
+        AB._pluginsLoaded = true;
         const enabled = AB.config?.plugins || [];
         list.innerHTML = AB.plugins.map(p => {
             const isOn = enabled.includes(p.name);
@@ -181,7 +208,7 @@ async function abLoadPlugins() {
                             ${locked ? 'opacity-50' : ''} bg-white dark:bg-[#1A1A1A]">
                     <div class="flex items-center gap-3">
                         <div class="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center">
-                            <i class="${abEsc(p.icon || 'fas fa-puzzle-piece')} text-primary-500 text-xs"></i>
+                            <i class="${abSafeClass(p.icon)} text-primary-500 text-xs"></i>
                         </div>
                         <div>
                             <div class="text-sm font-medium text-slate-700 dark:text-slate-200">${abEsc(p.name)}</div>
@@ -191,7 +218,7 @@ async function abLoadPlugins() {
                     ${locked
                         ? `<span class="text-xs text-slate-400 dark:text-slate-500"><i class="fas fa-lock text-[10px] mr-1"></i>${abEsc(p.required_plan || 'enterprise')}</span>`
                         : `<label class="relative inline-flex items-center cursor-pointer">
-                               <input type="checkbox" class="sr-only peer ab-plugin-toggle" data-plugin="${abEsc(p.name)}" ${isOn ? 'checked' : ''}>
+                               <input type="checkbox" class="sr-only peer ab-plugin-toggle" data-plugin="${abEscAttr(p.name)}" ${isOn ? 'checked' : ''}>
                                <div class="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-checked:bg-primary-400 rounded-full
                                            after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white
                                            after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
@@ -261,6 +288,7 @@ async function abLoadKnowledge() {
         }
         empty.classList.add('hidden');
 
+        // 使用 data-* 属性 + 事件委托，避免 onclick 中的 XSS
         list.innerHTML = AB.knowledgeFiles.map(f => {
             const statusIcon = f.status === 'completed' ? 'fa-check-circle text-green-500'
                 : f.status === 'processing' ? 'fa-spinner fa-spin text-primary-500'
@@ -277,15 +305,24 @@ async function abLoadKnowledge() {
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
-                        ${f.status === 'failed' ? `<button onclick="abReprocessKnowledge('${abEsc(f.id)}')" class="text-xs text-primary-500 hover:text-primary-600 cursor-pointer">重试</button>` : ''}
-                        <button onclick="abDeleteKnowledge('${abEsc(f.id)}')" class="text-xs text-red-400 hover:text-red-500 cursor-pointer">
+                        ${f.status === 'failed' ? `<button class="ab-btn-reprocess text-xs text-primary-500 hover:text-primary-600 cursor-pointer" data-id="${abEscAttr(f.id)}">重试</button>` : ''}
+                        <button class="ab-btn-delete-knowledge text-xs text-red-400 hover:text-red-500 cursor-pointer" data-id="${abEscAttr(f.id)}">
                             <i class="fas fa-trash text-[10px]"></i>
                         </button>
                     </div>
                 </div>`;
         }).join('');
+
+        // 事件委托绑定
+        list.querySelectorAll('.ab-btn-reprocess').forEach(btn => {
+            btn.addEventListener('click', () => abReprocessKnowledge(btn.dataset.id));
+        });
+        list.querySelectorAll('.ab-btn-delete-knowledge').forEach(btn => {
+            btn.addEventListener('click', () => abDeleteKnowledge(btn.dataset.id));
+        });
     } catch (e) {
         console.error('[AB] Load knowledge failed:', e);
+        abToast('加载知识库失败');
     }
 }
 
@@ -355,6 +392,7 @@ async function abLoadTools() {
         }
         empty.classList.add('hidden');
 
+        // 使用 data-* 属性 + addEventListener，避免 onclick XSS
         list.innerHTML = AB.customTools.map(t => `
             <div class="p-4 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A]">
                 <div class="flex items-center justify-between mb-2">
@@ -363,10 +401,10 @@ async function abLoadTools() {
                         <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-white/5 text-slate-500">${abEsc(t.execution?.method || 'GET')}</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button onclick="abEditTool('${abEsc(t.id)}')" class="text-xs text-slate-400 hover:text-primary-500 cursor-pointer">
+                        <button class="ab-btn-edit-tool text-xs text-slate-400 hover:text-primary-500 cursor-pointer" data-id="${abEscAttr(t.id)}">
                             <i class="fas fa-pen text-[10px]"></i>
                         </button>
-                        <button onclick="abDeleteTool('${abEsc(t.id)}')" class="text-xs text-red-400 hover:text-red-500 cursor-pointer">
+                        <button class="ab-btn-delete-tool text-xs text-red-400 hover:text-red-500 cursor-pointer" data-id="${abEscAttr(t.id)}">
                             <i class="fas fa-trash text-[10px]"></i>
                         </button>
                     </div>
@@ -375,8 +413,17 @@ async function abLoadTools() {
                 <div class="text-xs text-slate-400 dark:text-slate-500 font-mono truncate">${abEsc(t.execution?.url || '')}</div>
             </div>
         `).join('');
+
+        // 事件委托
+        list.querySelectorAll('.ab-btn-edit-tool').forEach(btn => {
+            btn.addEventListener('click', () => abEditTool(btn.dataset.id));
+        });
+        list.querySelectorAll('.ab-btn-delete-tool').forEach(btn => {
+            btn.addEventListener('click', () => abDeleteTool(btn.dataset.id));
+        });
     } catch (e) {
         console.error('[AB] Load tools failed:', e);
+        abToast('加载工具列表失败');
     }
 }
 
@@ -409,6 +456,8 @@ function abOpenToolModal(toolId = null) {
         document.getElementById('ab-tool-headers').value = '';
     }
     modal.classList.remove('hidden');
+    // 焦点移到第一个输入框
+    setTimeout(() => document.getElementById('ab-tool-name')?.focus(), 100);
 }
 
 function abCloseToolModal() {
@@ -421,6 +470,7 @@ function abEditTool(toolId) {
 }
 
 async function abSaveTool() {
+    if (AB._saving) return;
     const name = document.getElementById('ab-tool-name').value.trim();
     const desc = document.getElementById('ab-tool-desc').value.trim();
     const url = document.getElementById('ab-tool-url').value.trim();
@@ -431,6 +481,12 @@ async function abSaveTool() {
 
     if (!name || !desc || !url) {
         abToast('Name, Description and URL are required');
+        return;
+    }
+
+    // 验证工具名格式
+    if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(name)) {
+        abToast('Tool name must start with a letter and contain only letters, numbers, and underscores');
         return;
     }
 
@@ -459,9 +515,14 @@ async function abSaveTool() {
         },
     };
 
+    // 保存 editingToolId 到局部变量（abCloseToolModal 会清空它）
+    const isEdit = !!AB.editingToolId;
+    const editId = AB.editingToolId;
+
+    AB._saving = true;
     try {
-        if (AB.editingToolId) {
-            await abFetch(`/api/agent/tools/${AB.editingToolId}`, {
+        if (isEdit) {
+            await abFetch(`/api/agent/tools/${editId}`, {
                 method: 'PUT',
                 body: JSON.stringify(toolDef),
             });
@@ -473,9 +534,11 @@ async function abSaveTool() {
         }
         abCloseToolModal();
         abLoadTools();
-        abShowSaveStatus(AB.editingToolId ? '工具已更新' : '工具已添加');
+        abShowSaveStatus(isEdit ? '工具已更新' : '工具已添加');
     } catch (e) {
         abToast('保存失败: ' + e.message);
+    } finally {
+        AB._saving = false;
     }
 }
 
@@ -494,6 +557,22 @@ async function abDeleteTool(toolId) {
 // ---------------------------------------------------------------------------
 
 function abInit() {
+    // 防止重复绑定事件
+    if (AB._initialized) {
+        abLoadConfig();
+        abSwitchTab('basic');
+        return;
+    }
+    AB._initialized = true;
+
+    // Tab bar event delegation
+    const tabBar = document.getElementById('ab-tab-bar');
+    if (tabBar) {
+        tabBar.addEventListener('click', (e) => {
+            const tab = e.target.closest('.ab-tab');
+            if (tab && tab.dataset.tab) abSwitchTab(tab.dataset.tab);
+        });
+    }
     // File upload handler
     const fileInput = document.getElementById('ab-knowledge-file-input');
     if (fileInput) {
@@ -518,6 +597,12 @@ function abInit() {
             if (e.dataTransfer.files.length > 0) abUploadKnowledge(e.dataTransfer.files);
         });
     }
+    // Esc 关闭模态框
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !document.getElementById('ab-tool-modal')?.classList.contains('hidden')) {
+            abCloseToolModal();
+        }
+    });
     // Load config
     abLoadConfig();
     // Activate default tab

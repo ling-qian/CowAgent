@@ -188,7 +188,7 @@ def update_tool(tool_id: str):
     if data["name"] in existing_names:
         return jsonify({"error": f"Tool with name '{data['name']}' already exists"}), 409
 
-    # 保留原 ID，更新定义
+    # 强制使用路径参数中的 ID，忽略客户端传入的 id
     data["id"] = tool_id
     current_tools[tool_index] = data
     config.set_tools(current_tools)

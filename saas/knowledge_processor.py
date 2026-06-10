@@ -46,6 +46,9 @@ PLAN_LIMITS = {
 # 单文件最大大小
 MAX_FILE_SIZE_MB = 10
 
+# 提取文本最大字符数（防止 OOM）
+MAX_EXTRACT_CHARS = 5 * 1024 * 1024  # 5MB 文本
+
 
 def get_knowledge_dir(tenant_id: str) -> str:
     """获取租户知识文件目录"""
@@ -128,6 +131,12 @@ def process_file_async(tenant_id: str, file_id: str):
             text = extract_text(kf.file_path, kf.file_type)
             if not text.strip():
                 raise ValueError("No text content extracted from file")
+
+            # 截断过大文本（防止 OOM）
+            if len(text) > MAX_EXTRACT_CHARS:
+                logger.warning(f"[KnowledgeProcessor] File {file_id}: text too large "
+                               f"({len(text)} chars), truncating to {MAX_EXTRACT_CHARS}")
+                text = text[:MAX_EXTRACT_CHARS]
 
             # 2. 分块
             chunks = chunk_text(text)
