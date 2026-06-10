@@ -15,6 +15,7 @@ Knowledge Processor — 知识文件处理引擎
 - 限制知识总量以适配上下文窗口
 """
 
+import concurrent.futures
 import json
 import os
 import threading
@@ -163,13 +164,29 @@ def process_file_async(tenant_id: str, file_id: str):
 
 
 def start_processing(tenant_id: str, file_id: str):
-    """启动后台处理线程"""
-    thread = threading.Thread(
-        target=process_file_async,
-        args=(tenant_id, file_id),
-        daemon=True,
-    )
-    thread.start()
+    """启动后台处理线程（使用线程池限制并发）"""
+    _submit_to_pool(process_file_async, tenant_id, file_id)
+
+
+# 知识处理线程池（限制并发，防止资源耗尽）
+_KNOWLEDGE_EXECUTOR = None
+_MAX_CONCURRENT_PROCESSES = 4
+
+
+def _get_executor():
+    global _KNOWLEDGE_EXECUTOR
+    if _KNOWLEDGE_EXECUTOR is None:
+        _KNOWLEDGE_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
+            max_workers=_MAX_CONCURRENT_PROCESSES,
+            thread_name_prefix="knowledge-processor",
+        )
+    return _KNOWLEDGE_EXECUTOR
+
+
+def _submit_to_pool(fn, *args):
+    """提交任务到线程池"""
+    executor = _get_executor()
+    executor.submit(fn, *args)
 
 
 def extract_text(file_path: str, file_type: str) -> str:

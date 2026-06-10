@@ -22,6 +22,32 @@ const AB = {
 // API Helpers
 // ---------------------------------------------------------------------------
 
+/** HTML 转义，防止 XSS */
+function abEsc(str) {
+    const d = document.createElement('div');
+    d.textContent = String(str ?? '');
+    return d.innerHTML;
+}
+
+/** 显示 toast 通知 */
+function abToast(msg, type = 'error') {
+    let container = document.getElementById('ab-toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'ab-toast-container';
+        container.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;';
+        document.body.appendChild(container);
+    }
+    const colors = type === 'success'
+        ? 'bg-green-500 text-white'
+        : 'bg-red-500 text-white';
+    const el = document.createElement('div');
+    el.className = `px-4 py-2 rounded-lg shadow-lg text-sm ${colors} transition-opacity duration-300`;
+    el.textContent = msg;
+    container.appendChild(el);
+    setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 3000);
+}
+
 async function abFetch(url, opts = {}) {
     const token = localStorage.getItem('cow_api_key') || '';
     const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
@@ -108,7 +134,7 @@ async function abSaveConfig() {
         });
         abShowSaveStatus('已保存');
     } catch (e) {
-        alert('保存失败: ' + e.message);
+        abToast('保存失败: ' + e.message);
     }
 }
 
@@ -155,17 +181,17 @@ async function abLoadPlugins() {
                             ${locked ? 'opacity-50' : ''} bg-white dark:bg-[#1A1A1A]">
                     <div class="flex items-center gap-3">
                         <div class="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center">
-                            <i class="${p.icon || 'fas fa-puzzle-piece'} text-primary-500 text-xs"></i>
+                            <i class="${abEsc(p.icon || 'fas fa-puzzle-piece')} text-primary-500 text-xs"></i>
                         </div>
                         <div>
-                            <div class="text-sm font-medium text-slate-700 dark:text-slate-200">${p.name}</div>
-                            <div class="text-xs text-slate-400 dark:text-slate-500">${p.description || ''}</div>
+                            <div class="text-sm font-medium text-slate-700 dark:text-slate-200">${abEsc(p.name)}</div>
+                            <div class="text-xs text-slate-400 dark:text-slate-500">${abEsc(p.description || '')}</div>
                         </div>
                     </div>
                     ${locked
-                        ? `<span class="text-xs text-slate-400 dark:text-slate-500"><i class="fas fa-lock text-[10px] mr-1"></i>${p.required_plan || 'enterprise'}</span>`
+                        ? `<span class="text-xs text-slate-400 dark:text-slate-500"><i class="fas fa-lock text-[10px] mr-1"></i>${abEsc(p.required_plan || 'enterprise')}</span>`
                         : `<label class="relative inline-flex items-center cursor-pointer">
-                               <input type="checkbox" class="sr-only peer ab-plugin-toggle" data-plugin="${p.name}" ${isOn ? 'checked' : ''}>
+                               <input type="checkbox" class="sr-only peer ab-plugin-toggle" data-plugin="${abEsc(p.name)}" ${isOn ? 'checked' : ''}>
                                <div class="w-9 h-5 bg-slate-200 dark:bg-slate-700 peer-checked:bg-primary-400 rounded-full
                                            after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white
                                            after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
@@ -201,7 +227,7 @@ async function abTogglePlugin(e) {
         abShowSaveStatus(enabled ? `已启用 ${name}` : `已禁用 ${name}`);
     } catch (err) {
         e.target.checked = !enabled; // revert
-        alert(err.message);
+        abToast(err.message);
     }
 }
 
@@ -246,13 +272,13 @@ async function abLoadKnowledge() {
                     <div class="flex items-center gap-3 min-w-0">
                         <i class="fas ${statusIcon} text-sm"></i>
                         <div class="min-w-0">
-                            <div class="text-sm text-slate-700 dark:text-slate-200 truncate">${f.filename}</div>
-                            <div class="text-xs text-slate-400 dark:text-slate-500">${f.chunks || 0} chunks · ${f.char_count || 0} chars</div>
+                            <div class="text-sm text-slate-700 dark:text-slate-200 truncate">${abEsc(f.filename)}</div>
+                            <div class="text-xs text-slate-400 dark:text-slate-500">${abEsc(f.chunk_count || 0)} chunks · ${abEsc(f.file_size || 0)} bytes</div>
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
-                        ${f.status === 'failed' ? `<button onclick="abReprocessKnowledge('${f.id}')" class="text-xs text-primary-500 hover:text-primary-600 cursor-pointer">重试</button>` : ''}
-                        <button onclick="abDeleteKnowledge('${f.id}')" class="text-xs text-red-400 hover:text-red-500 cursor-pointer">
+                        ${f.status === 'failed' ? `<button onclick="abReprocessKnowledge('${abEsc(f.id)}')" class="text-xs text-primary-500 hover:text-primary-600 cursor-pointer">重试</button>` : ''}
+                        <button onclick="abDeleteKnowledge('${abEsc(f.id)}')" class="text-xs text-red-400 hover:text-red-500 cursor-pointer">
                             <i class="fas fa-trash text-[10px]"></i>
                         </button>
                     </div>
@@ -281,7 +307,7 @@ async function abUploadKnowledge(files) {
                 throw new Error(err.error || `HTTP ${resp.status}`);
             }
         } catch (e) {
-            alert(`上传 ${file.name} 失败: ${e.message}`);
+            abToast(`上传 ${file.name} 失败: ${e.message}`);
         }
     }
     abLoadKnowledge();
@@ -293,7 +319,7 @@ async function abDeleteKnowledge(fileId) {
         await abFetch(`/api/agent/knowledge/${fileId}`, { method: 'DELETE' });
         abLoadKnowledge();
     } catch (e) {
-        alert('删除失败: ' + e.message);
+        abToast('删除失败: ' + e.message);
     }
 }
 
@@ -302,7 +328,7 @@ async function abReprocessKnowledge(fileId) {
         await abFetch(`/api/agent/knowledge/${fileId}/reprocess`, { method: 'POST' });
         abLoadKnowledge();
     } catch (e) {
-        alert('重处理失败: ' + e.message);
+        abToast('重处理失败: ' + e.message);
     }
 }
 
@@ -333,20 +359,20 @@ async function abLoadTools() {
             <div class="p-4 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#1A1A1A]">
                 <div class="flex items-center justify-between mb-2">
                     <div class="flex items-center gap-2">
-                        <code class="text-sm font-mono font-semibold text-primary-600 dark:text-primary-400">${t.name}</code>
-                        <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-white/5 text-slate-500">${t.execution?.method || 'GET'}</span>
+                        <code class="text-sm font-mono font-semibold text-primary-600 dark:text-primary-400">${abEsc(t.name)}</code>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-white/5 text-slate-500">${abEsc(t.execution?.method || 'GET')}</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button onclick="abEditTool('${t.id}')" class="text-xs text-slate-400 hover:text-primary-500 cursor-pointer">
+                        <button onclick="abEditTool('${abEsc(t.id)}')" class="text-xs text-slate-400 hover:text-primary-500 cursor-pointer">
                             <i class="fas fa-pen text-[10px]"></i>
                         </button>
-                        <button onclick="abDeleteTool('${t.id}')" class="text-xs text-red-400 hover:text-red-500 cursor-pointer">
+                        <button onclick="abDeleteTool('${abEsc(t.id)}')" class="text-xs text-red-400 hover:text-red-500 cursor-pointer">
                             <i class="fas fa-trash text-[10px]"></i>
                         </button>
                     </div>
                 </div>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">${t.description}</p>
-                <div class="text-xs text-slate-400 dark:text-slate-500 font-mono truncate">${t.execution?.url || ''}</div>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">${abEsc(t.description)}</p>
+                <div class="text-xs text-slate-400 dark:text-slate-500 font-mono truncate">${abEsc(t.execution?.url || '')}</div>
             </div>
         `).join('');
     } catch (e) {
@@ -404,20 +430,20 @@ async function abSaveTool() {
     const headersStr = document.getElementById('ab-tool-headers').value.trim();
 
     if (!name || !desc || !url) {
-        alert('Name, Description and URL are required');
+        abToast('Name, Description and URL are required');
         return;
     }
 
     let parameters = { type: 'object', properties: {} };
     if (paramsStr) {
         try { parameters = JSON.parse(paramsStr); }
-        catch { alert('Parameters must be valid JSON'); return; }
+        catch { abToast('Parameters must be valid JSON'); return; }
     }
 
     let headers = {};
     if (headersStr) {
         try { headers = JSON.parse(headersStr); }
-        catch { alert('Headers must be valid JSON'); return; }
+        catch { abToast('Headers must be valid JSON'); return; }
     }
 
     const toolDef = {
@@ -449,7 +475,7 @@ async function abSaveTool() {
         abLoadTools();
         abShowSaveStatus(AB.editingToolId ? '工具已更新' : '工具已添加');
     } catch (e) {
-        alert('保存失败: ' + e.message);
+        abToast('保存失败: ' + e.message);
     }
 }
 
@@ -459,7 +485,7 @@ async function abDeleteTool(toolId) {
         await abFetch(`/api/agent/tools/${toolId}`, { method: 'DELETE' });
         abLoadTools();
     } catch (e) {
-        alert('删除失败: ' + e.message);
+        abToast('删除失败: ' + e.message);
     }
 }
 
