@@ -107,6 +107,7 @@ function abSwitchTab(tab) {
     if (tab === 'plugins' && !AB._pluginsLoaded) abLoadPlugins();
     if (tab === 'knowledge') abLoadKnowledge();
     if (tab === 'tools') abLoadTools();
+    if (tab === 'channels') abLoadChannels();
     if (tab === 'preview') abRenderPreview();
 }
 
@@ -554,6 +555,88 @@ async function abDeleteTool(toolId) {
 }
 
 // ---------------------------------------------------------------------------
+// Channels (IM Channel Bindings)
+// ---------------------------------------------------------------------------
+
+const _CHANNEL_TYPES = [
+    { value: 'feishu', label: '飞书' },
+    { value: 'dingtalk', label: '钉钉' },
+    { value: 'wechat_mp', label: '微信公众号' },
+    { value: 'wechat_com', label: '企业微信' },
+    { value: 'wechat_kf', label: '微信客服' },
+    { value: 'wecom_bot', label: '企微机器人' },
+];
+
+async function abLoadChannels() {
+    const listEl = document.getElementById('ab-channels-list');
+    if (!listEl) return;
+    try {
+        const res = await abFetch('/api/im-channels');
+        const data = await res.json();
+        const mappings = data.mappings || [];
+        if (mappings.length === 0) {
+            listEl.innerHTML = '<p class="text-sm text-slate-400 text-center py-4">暂无通道绑定</p>';
+            return;
+        }
+        listEl.innerHTML = mappings.map(m => {
+            const typeLabel = (_CHANNEL_TYPES.find(t => t.value === m.channel_type) || {}).label || m.channel_type;
+            return `<div class="flex items-center justify-between p-4 bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10">
+                <div class="flex items-center gap-3">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">${abEsc(typeLabel)}</span>
+                    <span class="text-sm text-slate-700 dark:text-slate-200">${abEsc(m.app_id)}</span>
+                </div>
+                <button class="ab-delete-channel text-red-400 hover:text-red-600 cursor-pointer p-1" data-id="${abEscAttr(String(m.id))}" title="删除">
+                    <i class="fas fa-trash-alt text-sm"></i>
+                </button>
+            </div>`;
+        }).join('');
+        // Bind delete buttons
+        listEl.querySelectorAll('.ab-delete-channel').forEach(btn => {
+            btn.addEventListener('click', () => abDeleteChannel(btn.dataset.id));
+        });
+    } catch (e) {
+        abToast('加载通道失败', 'error');
+    }
+}
+
+async function abAddChannel() {
+    const channelType = prompt('选择通道类型:\n' + _CHANNEL_TYPES.map((t, i) => `${i + 1}. ${t.label}`).join('\n'));
+    if (!channelType) return;
+    const idx = parseInt(channelType) - 1;
+    if (idx < 0 || idx >= _CHANNEL_TYPES.length) { abToast('无效选择', 'error'); return; }
+    const type = _CHANNEL_TYPES[idx].value;
+    const appId = prompt('请输入 App ID:');
+    if (!appId) return;
+    const appSecret = prompt('请输入 App Secret（可选，可直接回车跳过）:') || '';
+
+    try {
+        const res = await abFetch('/api/im-channels', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channel_type: type, app_id: appId, app_secret: appSecret }),
+        });
+        if (res.ok) {
+            abToast('通道绑定成功');
+            abLoadChannels();
+        } else {
+            const data = await res.json();
+            abToast(data.error || '绑定失败', 'error');
+        }
+    } catch (e) {
+        abToast('绑定请求失败', 'error');
+    }
+}
+
+async function abDeleteChannel(mappingId) {
+    if (!confirm('确定要删除此通道绑定吗？')) return;
+    try {
+        const res = await abFetch(`/api/im-channels/${mappingId}`, { method: 'DELETE' });
+        if (res.ok) { abToast('已删除'); abLoadChannels(); }
+        else { abToast('删除失败', 'error'); }
+    } catch (e) { abToast('删除请求失败', 'error'); }
+}
+
+// ---------------------------------------------------------------------------
 // Preview & Test
 // ---------------------------------------------------------------------------
 
@@ -677,6 +760,9 @@ function abInit() {
     if (previewInput) previewInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); abSendPreviewMessage(); }
     });
+    // Add channel button
+    const addChannelBtn = document.getElementById('ab-add-channel-btn');
+    if (addChannelBtn) addChannelBtn.addEventListener('click', abAddChannel);
     // Load config
     abLoadConfig();
     // Activate default tab

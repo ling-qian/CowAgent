@@ -1511,6 +1511,9 @@ class FeiShuChanel(ChatChannel):
             context["channel_type"] = self.channel_type
         if "origin_ctype" not in context:
             context["origin_ctype"] = ctype
+        # SaaS: inject app_id for tenant routing
+        if "app_id" not in context and hasattr(self, "feishu_app_id"):
+            context["app_id"] = self.feishu_app_id
 
         cmsg = context["msg"]
 

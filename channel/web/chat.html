@@ -1102,6 +1102,9 @@
                                 <button class="ab-tab flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150" data-tab="tools">
                                     <i class="fas fa-wrench text-xs"></i><span data-i18n="ab_tab_tools">工具</span>
                                 </button>
+                                <button class="ab-tab flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150" data-tab="channels">
+                                    <i class="fas fa-plug text-xs"></i><span data-i18n="ab_tab_channels">通道</span>
+                                </button>
                                 <button class="ab-tab flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150" data-tab="preview">
                                     <i class="fas fa-eye text-xs"></i><span data-i18n="ab_tab_preview">预览</span>
                                 </button>
@@ -1218,6 +1221,17 @@
                                         <p data-i18n="ab_tools_empty">暂无自定义工具</p>
                                     </div>
                                     <div id="ab-tools-list" class="space-y-3"></div>
+                                </div>
+                            </div>
+
+                            <!-- Tab: Channels -->
+                            <div id="ab-panel-channels" class="ab-panel hidden">
+                                <div class="space-y-4">
+                                    <p class="text-sm text-slate-500 dark:text-slate-400" data-i18n="ab_channels_desc">绑定 IM 通道后，用户通过该通道发送的消息将自动路由到你的 Agent。</p>
+                                    <div id="ab-channels-list" class="space-y-3"></div>
+                                    <button id="ab-add-channel-btn" class="w-full py-3 rounded-xl border-2 border-dashed border-slate-200 dark:border-white/10 text-sm text-slate-400 hover:border-primary-500 hover:text-primary-500 cursor-pointer transition-colors">
+                                        <i class="fas fa-plus mr-1"></i><span data-i18n="ab_add_channel">添加通道</span>
+                                    </button>
                                 </div>
                             </div>
 

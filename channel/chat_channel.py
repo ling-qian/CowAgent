@@ -36,6 +36,10 @@ class ChatChannel(Channel):
         self.futures = {}
         self.sessions = {}
         self.lock = threading.Lock()
+
+        # SaaS: auto-detect app_id from channel config for tenant routing
+        self._saas_app_id = self._detect_app_id()
+
         _thread = threading.Thread(target=self.consume)
         _thread.setDaemon(True)
         _thread.start()
@@ -48,6 +52,11 @@ class ChatChannel(Channel):
             context["channel_type"] = self.channel_type
         if "origin_ctype" not in context:
             context["origin_ctype"] = ctype
+        # SaaS: inject app_id for tenant routing
+        if "app_id" not in context:
+            app_id = getattr(self, "_saas_app_id", None)
+            if app_id:
+                context["app_id"] = app_id
         # context首次传入时，receiver是None，根据类型设置receiver
         first_in = "receiver" not in context
         # 群名匹配过程，设置session_id和receiver
