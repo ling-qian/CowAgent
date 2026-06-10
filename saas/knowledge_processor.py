@@ -367,12 +367,24 @@ def load_knowledge_context(tenant_id: str, knowledge_ids: List[str],
 
     from saas.database import KnowledgeFile
 
+    # 批量查询替代 N+1
+    valid_ids = [fid for fid in knowledge_ids if fid]
+    if not valid_ids:
+        return ""
+    files = KnowledgeFile.query.filter(
+        KnowledgeFile.id.in_(valid_ids),
+        KnowledgeFile.tenant_id == tenant_id,
+        KnowledgeFile.status == "ready",
+    ).all()
+    # 按 knowledge_ids 顺序排列
+    file_map = {kf.id: kf for kf in files}
+
     parts = []
     total_chars = 0
 
     for fid in knowledge_ids:
-        kf = KnowledgeFile.query.get(fid)
-        if not kf or kf.status != "ready" or kf.tenant_id != tenant_id:
+        kf = file_map.get(fid)
+        if not kf:
             continue
 
         # 读取 chunks 文件

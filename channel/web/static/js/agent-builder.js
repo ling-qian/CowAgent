@@ -107,6 +107,7 @@ function abSwitchTab(tab) {
     if (tab === 'plugins' && !AB._pluginsLoaded) abLoadPlugins();
     if (tab === 'knowledge') abLoadKnowledge();
     if (tab === 'tools') abLoadTools();
+    if (tab === 'preview') abRenderPreview();
 }
 
 // ---------------------------------------------------------------------------
@@ -553,6 +554,72 @@ async function abDeleteTool(toolId) {
 }
 
 // ---------------------------------------------------------------------------
+// Preview & Test
+// ---------------------------------------------------------------------------
+
+function abRenderPreview() {
+    const summaryEl = document.getElementById('ab-preview-summary');
+    if (!summaryEl) return;
+
+    const cfg = AB.config || {};
+    const items = [
+        { label: '名称', value: cfg.name || '-' },
+        { label: '模型', value: cfg.model || '-' },
+        { label: '温度', value: cfg.temperature ?? '-' },
+        { label: '最大步数', value: cfg.max_steps ?? '-' },
+        { label: '系统提示词', value: (cfg.system_prompt || '-').substring(0, 200) + ((cfg.system_prompt || '').length > 200 ? '...' : '') },
+        { label: '插件', value: (cfg.plugins && cfg.plugins.length) ? cfg.plugins.join(', ') : '-' },
+        { label: '知识文件', value: (cfg.knowledge_ids && cfg.knowledge_ids.length) ? cfg.knowledge_ids.length + ' 个' : '-' },
+        { label: '自定义工具', value: AB.tools ? AB.tools.length + ' 个' : '-' },
+    ];
+
+    summaryEl.innerHTML = items.map(it =>
+        `<div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-white/5 last:border-0">
+            <span class="text-slate-500 dark:text-slate-400">${abEsc(it.label)}</span>
+            <span class="text-slate-800 dark:text-slate-200 text-right max-w-[60%] truncate">${abEsc(String(it.value))}</span>
+        </div>`
+    ).join('');
+}
+
+async function abSendPreviewMessage() {
+    const input = document.getElementById('ab-preview-input');
+    const chatEl = document.getElementById('ab-preview-chat');
+    if (!input || !chatEl) return;
+
+    const msg = input.value.trim();
+    if (!msg) return;
+    input.value = '';
+
+    // 显示用户消息
+    chatEl.innerHTML += `<div class="flex justify-end"><div class="bg-primary-500 text-white px-3 py-1.5 rounded-xl rounded-br-sm text-sm max-w-[80%]">${abEsc(msg)}</div></div>`;
+
+    // 显示加载中
+    const loadingId = 'ab-preview-loading-' + Date.now();
+    chatEl.innerHTML += `<div id="${loadingId}" class="flex justify-start"><div class="bg-slate-100 dark:bg-white/10 px-3 py-1.5 rounded-xl rounded-bl-sm text-sm text-slate-400"><i class="fas fa-spinner fa-spin"></i></div></div>`;
+    chatEl.scrollTop = chatEl.scrollHeight;
+
+    try {
+        const res = await abFetch('/api/agent/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: msg }),
+        });
+        const data = await res.json();
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) {
+            const reply = data.content || data.message || data.error || '无响应';
+            loadingEl.outerHTML = `<div class="flex justify-start"><div class="bg-slate-100 dark:bg-white/10 px-3 py-1.5 rounded-xl rounded-bl-sm text-sm text-slate-700 dark:text-slate-200 max-w-[80%] whitespace-pre-wrap">${abEsc(reply)}</div></div>`;
+        }
+    } catch (e) {
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) {
+            loadingEl.outerHTML = `<div class="flex justify-start"><div class="bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-xl rounded-bl-sm text-sm text-red-500">请求失败</div></div>`;
+        }
+    }
+    chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+// ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
 
@@ -602,6 +669,13 @@ function abInit() {
         if (e.key === 'Escape' && !document.getElementById('ab-tool-modal')?.classList.contains('hidden')) {
             abCloseToolModal();
         }
+    });
+    // Preview send button & enter key
+    const previewSendBtn = document.getElementById('ab-preview-send');
+    if (previewSendBtn) previewSendBtn.addEventListener('click', abSendPreviewMessage);
+    const previewInput = document.getElementById('ab-preview-input');
+    if (previewInput) previewInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); abSendPreviewMessage(); }
     });
     // Load config
     abLoadConfig();

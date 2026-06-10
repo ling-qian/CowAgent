@@ -53,7 +53,10 @@ def _chat_via_factory(tenant_id: str, message: str, session_id: str,
     # 获取 AgentConfig（不存在则创建默认配置）
     config = get_or_create_default_config(tenant_id)
 
-    # 如果请求中指定了 system_prompt，临时覆盖
+    # 如果请求中指定了 system_prompt，临时覆盖（不修改数据库）
+    # 通过 expunge 使 config 脱离 SQLAlchemy session，避免 auto-flush 持久化
+    from saas.database import db
+    db.session.expunge(config)
     if system_prompt:
         config.system_prompt = system_prompt
 
@@ -65,7 +68,7 @@ def _chat_via_factory(tenant_id: str, message: str, session_id: str,
         content = agent.run_stream(message, clear_history=False)
     except Exception as e:
         logger.error(f"[ChatEngine] AgentFactory run_stream error: {e}", exc_info=True)
-        content = f"对话引擎错误: {str(e)}"
+        content = "对话引擎错误，请稍后重试"
 
     # 估算 token 用量
     prompt_tokens = int(len(message) * 1.5)

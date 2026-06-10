@@ -241,6 +241,7 @@ class AgentFactory:
                 oldest_key = next(iter(cls._instances))
                 cls._instances.pop(oldest_key, None)
                 cls._versions.pop(oldest_key, None)
+                cls._knowledge_cache.pop(oldest_key, None)
                 logger.info(f"[AgentFactory] LRU evicted agent for tenant {oldest_key}")
 
             logger.info(f"[AgentFactory] Created agent for tenant {tenant_id}, "
@@ -260,14 +261,17 @@ class AgentFactory:
         """
         from agent.protocol.agent import Agent
 
+        # 预查询租户计划（_load_tools 和 _load_knowledge 共用）
+        tenant_plan = cls._get_tenant_plan(config.tenant_id)
+
         # 1. 创建 LLM 客户端
         llm = cls._create_llm(config)
 
         # 2. 加载工具
-        tools = cls._load_tools(config)
+        tools = cls._load_tools(config, tenant_plan)
 
         # 3. 加载知识库上下文
-        knowledge_context = cls._load_knowledge(config)
+        knowledge_context = cls._load_knowledge(config, tenant_plan)
 
         # 4. 构建完整 system prompt
         full_prompt = config.system_prompt or "You are a helpful assistant."
@@ -310,7 +314,7 @@ class AgentFactory:
         )
 
     @classmethod
-    def _load_tools(cls, config) -> list:
+    def _load_tools(cls, config, tenant_plan: str = None) -> list:
         """加载工具：根据租户启用的插件从 ToolManager 加载对应工具
 
         流程：
@@ -325,8 +329,9 @@ class AgentFactory:
             get_default_plugins_for_plan,
         )
 
-        # 获取租户计划
-        tenant_plan = cls._get_tenant_plan(config.tenant_id)
+        # 获取租户计划（优先使用传入参数，避免重复查询）
+        if tenant_plan is None:
+            tenant_plan = cls._get_tenant_plan(config.tenant_id)
 
         # 获取启用的插件列表
         enabled_plugins = config.get_plugins()
@@ -395,7 +400,7 @@ class AgentFactory:
             return "free"
 
     @classmethod
-    def _load_knowledge(cls, config) -> str:
+    def _load_knowledge(cls, config, tenant_plan: str = None) -> str:
         """加载知识库内容注入 Agent 上下文
 
         从 AgentConfig.knowledge_ids 读取知识文件 ID 列表，
@@ -417,8 +422,9 @@ class AgentFactory:
         if cached and cached[0] == config.config_version:
             return cached[1]
 
-        # 获取计划限制
-        tenant_plan = cls._get_tenant_plan(config.tenant_id)
+        # 获取计划限制（优先使用传入参数，避免重复查询）
+        if tenant_plan is None:
+            tenant_plan = cls._get_tenant_plan(config.tenant_id)
         from saas.knowledge_processor import load_knowledge_context, get_plan_limits
         limits = get_plan_limits(tenant_plan)
         max_chars = limits.get("max_context_chars", 50000)

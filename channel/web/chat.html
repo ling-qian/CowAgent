@@ -1102,6 +1102,9 @@
                                 <button class="ab-tab flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150" data-tab="tools">
                                     <i class="fas fa-wrench text-xs"></i><span data-i18n="ab_tab_tools">工具</span>
                                 </button>
+                                <button class="ab-tab flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all duration-150" data-tab="preview">
+                                    <i class="fas fa-eye text-xs"></i><span data-i18n="ab_tab_preview">预览</span>
+                                </button>
                             </div>
 
                             <!-- Tab: Basic -->
@@ -1215,6 +1218,33 @@
                                         <p data-i18n="ab_tools_empty">暂无自定义工具</p>
                                     </div>
                                     <div id="ab-tools-list" class="space-y-3"></div>
+                                </div>
+                            </div>
+
+                            <!-- Tab: Preview & Test -->
+                            <div id="ab-panel-preview" class="ab-panel hidden">
+                                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                    <!-- Config Summary -->
+                                    <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6">
+                                        <h4 class="text-sm font-medium text-slate-600 dark:text-slate-400 mb-3" data-i18n="ab_config_summary">配置摘要</h4>
+                                        <div id="ab-preview-summary" class="space-y-2 text-sm text-slate-700 dark:text-slate-300"></div>
+                                    </div>
+                                    <!-- Chat Preview -->
+                                    <div class="bg-white dark:bg-[#1A1A1A] rounded-xl border border-slate-200 dark:border-white/10 p-6 flex flex-col">
+                                        <h4 class="text-sm font-medium text-slate-600 dark:text-slate-400 mb-3" data-i18n="ab_chat_preview">对话预览</h4>
+                                        <div id="ab-preview-chat" class="flex-1 min-h-[200px] max-h-[300px] overflow-y-auto space-y-2 mb-3"></div>
+                                        <div class="flex gap-2">
+                                            <input id="ab-preview-input" type="text"
+                                                   class="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600
+                                                          bg-slate-50 dark:bg-white/5 text-sm text-slate-800 dark:text-slate-100
+                                                          focus:outline-none focus:border-primary-500 transition-colors"
+                                                   placeholder="输入测试消息..."
+                                                   data-i18n-placeholder="ab_preview_placeholder">
+                                            <button id="ab-preview-send" class="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium cursor-pointer transition-colors">
+                                                <i class="fas fa-paper-plane text-xs"></i>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
