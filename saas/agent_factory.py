@@ -344,11 +344,9 @@ class AgentFactory:
 
         # 获取对应的 tool class 名称
         tool_class_names = get_tool_classes_for_plugins(valid_plugins)
-        if not tool_class_names:
-            return []
 
-        # 从 ToolManager 加载工具实例
         tools = []
+        # 从 ToolManager 加载插件工具实例
         try:
             from agent.tools import ToolManager
             tm = ToolManager()
@@ -365,6 +363,24 @@ class AgentFactory:
                     logger.debug(f"[AgentFactory] Tool {tool_name} not found in ToolManager")
         except Exception as e:
             logger.warning(f"[AgentFactory] ToolManager load failed: {e}")
+
+        # 加载自定义工具（Custom Tools）
+        custom_tool_defs = config.get_tools()
+        if custom_tool_defs:
+            # 计划限制检查
+            from saas.custom_tool_executor import get_plan_tool_limit, create_custom_tools
+            tool_limit = get_plan_tool_limit(tenant_plan)
+            if tool_limit == 0:
+                logger.debug(f"[AgentFactory] Custom tools disabled for plan {tenant_plan}")
+            else:
+                if tool_limit > 0:
+                    custom_tool_defs = custom_tool_defs[:tool_limit]
+                custom_tools = create_custom_tools(custom_tool_defs)
+                tools.extend(custom_tools)
+                if custom_tools:
+                    logger.info(f"[AgentFactory] Loaded {len(custom_tools)} custom tools for "
+                                f"tenant {config.tenant_id}")
+
         return tools
 
     @staticmethod

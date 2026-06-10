@@ -15,8 +15,18 @@ const I18N = {
         console: '控制台',
         nav_chat: '对话', nav_manage: '管理', nav_monitor: '监控',
         menu_chat: '对话', menu_config: '配置', menu_models: '模型', menu_skills: '技能',
+        menu_agent_builder: 'Agent 构建',
         menu_memory: '记忆', menu_knowledge: '知识', menu_channels: '通道', menu_tasks: '定时',
         menu_logs: '日志',
+        ab_title: 'Agent 构建', ab_desc: '定制你的专属 AI Agent',
+        ab_tab_basic: '基础', ab_tab_model: '模型', ab_tab_plugins: '插件', ab_tab_knowledge: '知识', ab_tab_tools: '工具',
+        ab_name: 'Agent 名称', ab_description: '描述', ab_system_prompt: '系统提示词',
+        ab_temperature: 'Temperature', ab_max_steps: '最大执行步数', ab_enable_thinking: 'Deep Thinking',
+        ab_save: '保存', ab_reset: '重置',
+        ab_plugins_loading: '加载插件中...',
+        ab_knowledge_upload_hint: '点击或拖拽文件到此处上传', ab_knowledge_supported: '支持 txt, md, pdf, json, csv',
+        ab_knowledge_empty: '暂无知识文件',
+        ab_custom_tools: '自定义工具', ab_add_tool: '添加工具', ab_tools_empty: '暂无自定义工具',
         models_title: '模型管理',
         models_desc: '统一管理对话、图像、语音、向量、搜索能力',
         models_section_vendors: '厂商凭据',
@@ -219,8 +229,18 @@ const I18N = {
         console: 'Console',
         nav_chat: 'Chat', nav_manage: 'Management', nav_monitor: 'Monitor',
         menu_chat: 'Chat', menu_config: 'Config', menu_models: 'Models', menu_skills: 'Skills',
+        menu_agent_builder: 'Agent Builder',
         menu_memory: 'Memory', menu_knowledge: 'Knowledge', menu_channels: 'Channels', menu_tasks: 'Tasks',
         menu_logs: 'Logs',
+        ab_title: 'Agent Builder', ab_desc: 'Customize your AI Agent',
+        ab_tab_basic: 'Basic', ab_tab_model: 'Model', ab_tab_plugins: 'Plugins', ab_tab_knowledge: 'Knowledge', ab_tab_tools: 'Tools',
+        ab_name: 'Agent Name', ab_description: 'Description', ab_system_prompt: 'System Prompt',
+        ab_temperature: 'Temperature', ab_max_steps: 'Max Steps', ab_enable_thinking: 'Deep Thinking',
+        ab_save: 'Save', ab_reset: 'Reset',
+        ab_plugins_loading: 'Loading plugins...',
+        ab_knowledge_upload_hint: 'Click or drag files here to upload', ab_knowledge_supported: 'Supports txt, md, pdf, json, csv',
+        ab_knowledge_empty: 'No knowledge files',
+        ab_custom_tools: 'Custom Tools', ab_add_tool: 'Add Tool', ab_tools_empty: 'No custom tools',
         models_title: 'Models',
         models_desc: 'Manage chat, image, voice, embedding and search capabilities in one place',
         models_section_vendors: 'Vendor Credentials',
@@ -616,6 +636,7 @@ function toggleTheme() {
 // =====================================================================
 const VIEW_META = {
     chat:     { group: 'nav_chat',    page: 'menu_chat' },
+    'agent-builder': { group: 'nav_manage', page: 'menu_agent_builder' },
     config:   { group: 'nav_manage',  page: 'menu_config' },
     models:   { group: 'nav_manage',  page: 'menu_models' },
     skills:   { group: 'nav_manage',  page: 'menu_skills' },
@@ -642,6 +663,7 @@ function navigateTo(viewId) {
     document.getElementById('breadcrumb-page').textContent = t(meta.page);
     document.getElementById('breadcrumb-page').dataset.i18n = meta.page;
     currentView = viewId;
+    if (viewId === 'agent-builder' && window.abInit) window.abInit();
     if (window.innerWidth < 1024) closeSidebar();
 }
 

@@ -23,6 +23,9 @@ agent_bp = Blueprint("agent", __name__)
 
 def _serialize_config(config: AgentConfig) -> dict:
     """将 AgentConfig ORM 对象序列化为 API 响应字典"""
+    from saas.database import Tenant
+    tenant = Tenant.query.get(config.tenant_id)
+    tenant_plan = tenant.plan if tenant else "free"
     return {
         "id": config.id,
         "tenant_id": config.tenant_id,
@@ -42,6 +45,7 @@ def _serialize_config(config: AgentConfig) -> dict:
         "reasoning_effort": config.reasoning_effort,
         "config_version": config.config_version,
         "is_active": config.is_active,
+        "plan": tenant_plan,
         "created_at": config.created_at.isoformat() if config.created_at else None,
         "updated_at": config.updated_at.isoformat() if config.updated_at else None,
     }
@@ -247,7 +251,7 @@ def get_plugins():
 
     # 获取当前启用的插件
     config = AgentConfig.query.filter_by(tenant_id=tenant_id).first()
-    enabled_plugins = config.get_plugins() if config else []
+    enabled_plugins = (config.get_plugins() if config else None) or []
 
     # 获取按分类分组的可用插件
     categorized = get_plugins_by_category(tenant_plan)
@@ -289,7 +293,7 @@ def get_plugin_detail(plugin_name: str):
 
     # 获取当前启用状态
     config = AgentConfig.query.filter_by(tenant_id=tenant_id).first()
-    enabled_plugins = config.get_plugins() if config else []
+    enabled_plugins = (config.get_plugins() if config else None) or []
     enabled = plugin_name in enabled_plugins
 
     return jsonify({
