@@ -310,20 +310,113 @@ class AgentFactory:
 
     @classmethod
     def _load_tools(cls, config) -> list:
-        """加载工具：从 ToolManager 加载可用工具
+        """加载工具：根据租户启用的插件从 ToolManager 加载对应工具
 
-        Phase 1 不加载工具，返回空列表。
-        Phase 2 将加入按租户启用/禁用插件的能力。
+        流程：
+        1. 从 AgentConfig.plugins 读取启用的插件列表
+        2. 通过 plugin_registry 获取对应的 tool class 名称
+        3. 从 ToolManager 加载这些工具
+        4. 验证插件是否在租户计划下可用
         """
-        return []
+        from saas.plugin_registry import (
+            get_tool_classes_for_plugins,
+            is_plugin_available,
+            get_default_plugins_for_plan,
+        )
+
+        # 获取租户计划
+        tenant_plan = cls._get_tenant_plan(config.tenant_id)
+
+        # 获取启用的插件列表
+        enabled_plugins = config.get_plugins()
+
+        # 如果没有配置任何插件（None 或空列表），使用计划默认值
+        # 注意：用户明确设置空列表 [] 表示不需要任何插件
+        if enabled_plugins is None:
+            enabled_plugins = get_default_plugins_for_plan(tenant_plan)
+
+        # 过滤掉计划不可用的插件
+        valid_plugins = [p for p in enabled_plugins if is_plugin_available(p, tenant_plan)]
+        if len(valid_plugins) != len(enabled_plugins):
+            skipped = set(enabled_plugins) - set(valid_plugins)
+            logger.warning(f"[AgentFactory] Skipped unavailable plugins for tenant "
+                           f"{config.tenant_id} (plan={tenant_plan}): {skipped}")
+
+        # 获取对应的 tool class 名称
+        tool_class_names = get_tool_classes_for_plugins(valid_plugins)
+        if not tool_class_names:
+            return []
+
+        # 从 ToolManager 加载工具实例
+        tools = []
+        try:
+            from agent.tools import ToolManager
+            tm = ToolManager()
+            tm.load_tools()
+            for tool_name in tool_class_names:
+                if tool_name in tm.tool_classes:
+                    try:
+                        tool = tm.create_tool(tool_name)
+                        if tool:
+                            tools.append(tool)
+                    except Exception as e:
+                        logger.warning(f"[AgentFactory] Failed to load tool {tool_name}: {e}")
+                else:
+                    logger.debug(f"[AgentFactory] Tool {tool_name} not found in ToolManager")
+        except Exception as e:
+            logger.warning(f"[AgentFactory] ToolManager load failed: {e}")
+        return tools
+
+    @staticmethod
+    def _get_tenant_plan(tenant_id: str) -> str:
+        """获取租户的计划"""
+        try:
+            from saas.database import Tenant
+            tenant = Tenant.query.get(tenant_id)
+            return tenant.plan if tenant else "free"
+        except Exception:
+            return "free"
 
     @classmethod
     def _load_knowledge(cls, config) -> str:
-        """加载知识库内容
+        """加载知识库内容注入 Agent 上下文
 
-        Phase 1 返回空字符串（知识库功能在 Phase 3 实现）。
+        从 AgentConfig.knowledge_ids 读取知识文件 ID 列表，
+        通过 knowledge_processor 加载已处理的 chunks 内容，
+        拼接为一段文本用于 system prompt 注入。
+
+        v1 策略：System Prompt Injection（简单可靠）
+        - 将知识文本拼接到 system prompt 末尾
+        - 限制总量以适配上下文窗口
+        - 未来可升级为 RAG 检索方案
         """
-        return ""
+        knowledge_ids = config.get_knowledge_ids()
+        if not knowledge_ids:
+            return ""
+
+        # 获取计划限制
+        tenant_plan = cls._get_tenant_plan(config.tenant_id)
+        from saas.knowledge_processor import load_knowledge_context, get_plan_limits
+        limits = get_plan_limits(tenant_plan)
+        max_chars = limits.get("max_context_chars", 50000)
+
+        if max_chars <= 0:
+            logger.debug(f"[AgentFactory] Knowledge disabled for plan {tenant_plan}")
+            return ""
+
+        try:
+            context = load_knowledge_context(
+                tenant_id=config.tenant_id,
+                knowledge_ids=knowledge_ids,
+                max_chars=max_chars,
+            )
+            if context:
+                logger.info(f"[AgentFactory] Loaded knowledge context for tenant "
+                            f"{config.tenant_id}: {len(context)} chars")
+            return context
+        except Exception as e:
+            logger.warning(f"[AgentFactory] Failed to load knowledge: {e}")
+            return ""
 
     @classmethod
     def destroy(cls, tenant_id: str):

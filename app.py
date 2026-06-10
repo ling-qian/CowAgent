@@ -352,9 +352,13 @@ def run():
                 from saas.api.gdpr import gdpr_bp
                 from saas.api.im_channels import bp as im_channels_bp
                 from saas.api.agent import agent_bp
+                from saas.api.knowledge import knowledge_bp
 
                 saas_app = Flask(__name__)
                 CORS(saas_app)
+                # 保存全局引用供后台线程使用
+                import saas as _saas_mod
+                _saas_mod.set_flask_app(saas_app)
                 # 全局 JSON 错误处理器 — 确保所有错误响应都返回 JSON
                 @saas_app.errorhandler(400)
                 @saas_app.errorhandler(404)
@@ -394,6 +398,7 @@ def run():
                     saas_app.register_blueprint(chat_bp, url_prefix="/api/chat")
                     # Agent 配置蓝图
                     saas_app.register_blueprint(agent_bp, url_prefix="/api/agent")
+                    saas_app.register_blueprint(knowledge_bp, url_prefix="/api/agent/knowledge")
                     # 根路由和 debug 路由
                     @saas_app.route("/")
                     def index():

@@ -213,9 +213,9 @@ class AgentConfig(db.Model):
     api_base = db.Column(db.String(200))      # Tenant's own API base (optional)
 
     # Capability Config (JSON)
-    plugins = db.Column(db.Text, default="[]")       # JSON: ["web_search", "code_interpreter"]
-    tools = db.Column(db.Text, default="[]")         # JSON: custom tool definitions
-    knowledge_ids = db.Column(db.Text, default="[]") # JSON: knowledge file ID list
+    plugins = db.Column(db.Text)                     # JSON: ["web_search", "code_interpreter"], NULL=use defaults
+    tools = db.Column(db.Text)                       # JSON: custom tool definitions, NULL=empty
+    knowledge_ids = db.Column(db.Text)               # JSON: knowledge file ID list, NULL=empty
 
     # Behavior Parameters
     max_steps = db.Column(db.Integer, default=15)
@@ -233,10 +233,18 @@ class AgentConfig(db.Model):
     tenant = db.relationship("Tenant", backref="agent_config")
 
     def get_plugins(self) -> list:
-        """解析 plugins JSON 字段"""
+        """解析 plugins JSON 字段
+
+        Returns:
+            None if never configured (use plan defaults),
+            [] if explicitly set to empty (no plugins),
+            list of plugin names otherwise.
+        """
         import json as _json
+        if self.plugins is None:
+            return None  # 未配置，使用计划默认值
         try:
-            return _json.loads(self.plugins) if self.plugins else []
+            return _json.loads(self.plugins)
         except (ValueError, TypeError):
             return []
 
@@ -247,8 +255,10 @@ class AgentConfig(db.Model):
     def get_tools(self) -> list:
         """解析 tools JSON 字段"""
         import json as _json
+        if self.tools is None:
+            return []
         try:
-            return _json.loads(self.tools) if self.tools else []
+            return _json.loads(self.tools)
         except (ValueError, TypeError):
             return []
 
@@ -259,8 +269,10 @@ class AgentConfig(db.Model):
     def get_knowledge_ids(self) -> list:
         """解析 knowledge_ids JSON 字段"""
         import json as _json
+        if self.knowledge_ids is None:
+            return []
         try:
-            return _json.loads(self.knowledge_ids) if self.knowledge_ids else []
+            return _json.loads(self.knowledge_ids)
         except (ValueError, TypeError):
             return []
 

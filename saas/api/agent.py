@@ -7,6 +7,8 @@ PUT    /api/agent/config          — 更新 Agent 配置（支持部分更新�
 POST   /api/agent/config/reset    — 重置为默认配置
 GET    /api/agent/models          — 获取可用模型列表
 GET    /api/agent/stats           — 获取 AgentFactory 统计信息
+GET    /api/agent/plugins         — 获取可用插件列表（含启用状态）
+GET    /api/agent/plugins/<name>  — 获取单个插件详情
 """
 
 from flask import Blueprint, request, jsonify
@@ -31,7 +33,7 @@ def _serialize_config(config: AgentConfig) -> dict:
         "model": config.model,
         "api_key": "***" if config.api_key else "",  # 脱敏
         "api_base": config.api_base,
-        "plugins": config.get_plugins(),
+        "plugins": config.get_plugins() or [],  # None → [] for API response
         "tools": config.get_tools(),
         "knowledge_ids": config.get_knowledge_ids(),
         "max_steps": config.max_steps,
@@ -98,6 +100,15 @@ def update_config():
     if "plugins" in data:
         if not isinstance(data["plugins"], list):
             return jsonify({"error": "plugins must be an array"}), 400
+        # 验证插件是否在当前计划下可用
+        from saas.plugin_registry import validate_plugins_for_plan
+        tenant_plan = _get_tenant_plan(tenant_id)
+        unavailable = validate_plugins_for_plan(data["plugins"], tenant_plan)
+        if unavailable:
+            return jsonify({
+                "error": f"Plugins not available on {tenant_plan} plan: {unavailable}",
+                "unavailable_plugins": unavailable,
+            }), 403
         config.set_plugins(data["plugins"])
         changed = True
 
@@ -200,3 +211,97 @@ def get_stats():
 
     stats = AgentFactory.get_stats()
     return jsonify(stats)
+
+
+# ---------------------------------------------------------------------------
+# Plugin API
+# ---------------------------------------------------------------------------
+
+def _get_tenant_plan(tenant_id: str) -> str:
+    """获取租户计划"""
+    from saas.database import Tenant
+    tenant = Tenant.query.get(tenant_id)
+    return tenant.plan if tenant else "free"
+
+
+@agent_bp.route("/plugins", methods=["GET"])
+def get_plugins():
+    """获取可用插件列表（含当前启用状态）
+
+    返回按分类分组的插件列表，每个插件包含：
+    - name, display_name, description, category, icon
+    - enabled: 当前是否启用（基于 AgentConfig.plugins）
+    - available: 是否在当前计划下可用
+    """
+    tenant_id = current_tenant_id()
+    if not tenant_id:
+        return jsonify({"error": "Tenant not authenticated"}), 401
+
+    from saas.plugin_registry import (
+        get_available_plugins,
+        get_plugins_by_category,
+        is_plugin_available,
+    )
+
+    tenant_plan = _get_tenant_plan(tenant_id)
+
+    # 获取当前启用的插件
+    config = AgentConfig.query.filter_by(tenant_id=tenant_id).first()
+    enabled_plugins = config.get_plugins() if config else []
+
+    # 获取按分类分组的可用插件
+    categorized = get_plugins_by_category(tenant_plan)
+
+    # 为每个插件添加 enabled 状态
+    result = {}
+    for cat_key, cat_data in categorized.items():
+        plugins_with_status = []
+        for p in cat_data["plugins"]:
+            p["enabled"] = p["name"] in enabled_plugins
+            p["available"] = True  # get_plugins_by_category 已过滤
+            plugins_with_status.append(p)
+        result[cat_key] = {
+            "display_name": cat_data["display_name"],
+            "plugins": plugins_with_status,
+        }
+
+    return jsonify({
+        "plan": tenant_plan,
+        "categories": result,
+    })
+
+
+@agent_bp.route("/plugins/<plugin_name>", methods=["GET"])
+def get_plugin_detail(plugin_name: str):
+    """获取单个插件详情"""
+    tenant_id = current_tenant_id()
+    if not tenant_id:
+        return jsonify({"error": "Tenant not authenticated"}), 401
+
+    from saas.plugin_registry import get_plugin, is_plugin_available
+
+    plugin = get_plugin(plugin_name)
+    if not plugin:
+        return jsonify({"error": f"Plugin '{plugin_name}' not found"}), 404
+
+    tenant_plan = _get_tenant_plan(tenant_id)
+    available = is_plugin_available(plugin_name, tenant_plan)
+
+    # 获取当前启用状态
+    config = AgentConfig.query.filter_by(tenant_id=tenant_id).first()
+    enabled_plugins = config.get_plugins() if config else []
+    enabled = plugin_name in enabled_plugins
+
+    return jsonify({
+        "name": plugin["name"],
+        "display_name": plugin["display_name"],
+        "description": plugin["description"],
+        "category": plugin["category"],
+        "icon": plugin.get("icon", ""),
+        "enabled_by_default": plugin.get("enabled_by_default", False),
+        "plan_availability": plugin["plan_availability"],
+        "tool_classes": plugin.get("tool_classes", []),
+        "enabled": enabled,
+        "available": available,
+        "current_plan": tenant_plan,
+    })
