@@ -351,6 +351,7 @@ def run():
                 from saas.api.plugins import plugins_bp
                 from saas.api.gdpr import gdpr_bp
                 from saas.api.im_channels import bp as im_channels_bp
+                from saas.api.agent import agent_bp
 
                 saas_app = Flask(__name__)
                 CORS(saas_app)
@@ -391,6 +392,8 @@ def run():
                     # Chat 对话蓝图
                     from saas.api.chat import chat_bp
                     saas_app.register_blueprint(chat_bp, url_prefix="/api/chat")
+                    # Agent 配置蓝图
+                    saas_app.register_blueprint(agent_bp, url_prefix="/api/agent")
                     # 根路由和 debug 路由
                     @saas_app.route("/")
                     def index():

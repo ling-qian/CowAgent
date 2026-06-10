@@ -196,6 +196,104 @@ class IMChannelMapping(db.Model):
         return f"<IMChannelMapping {self.channel_type}:{self.app_id} @ {self.tenant_id}>"
 
 
+class AgentConfig(db.Model):
+    """租户级 Agent 配置表 — 每个租户一个独立 Agent"""
+    __tablename__ = "agent_config"
+
+    id = db.Column(db.String(36), primary_key=True, default=_gen_id)
+    tenant_id = db.Column(db.String(36), db.ForeignKey("tenants.id"), nullable=False, unique=True)
+    name = db.Column(db.String(100), nullable=False, default="My Agent")
+    avatar_url = db.Column(db.String(500))
+    description = db.Column(db.Text)
+
+    # Core LLM Config
+    system_prompt = db.Column(db.Text, default="You are a helpful assistant.")
+    model = db.Column(db.String(100), default="deepseek-chat")
+    api_key = db.Column(db.String(200))       # Tenant's own LLM key (optional)
+    api_base = db.Column(db.String(200))      # Tenant's own API base (optional)
+
+    # Capability Config (JSON)
+    plugins = db.Column(db.Text, default="[]")       # JSON: ["web_search", "code_interpreter"]
+    tools = db.Column(db.Text, default="[]")         # JSON: custom tool definitions
+    knowledge_ids = db.Column(db.Text, default="[]") # JSON: knowledge file ID list
+
+    # Behavior Parameters
+    max_steps = db.Column(db.Integer, default=15)
+    temperature = db.Column(db.Float, default=0.7)
+    enable_thinking = db.Column(db.Boolean, default=True)
+    reasoning_effort = db.Column(db.String(10), default="high")
+
+    # Metadata
+    config_version = db.Column(db.Integer, default=1)  # Incremented on each update
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=_now)
+    updated_at = db.Column(db.DateTime, nullable=False, default=_now, onupdate=_now)
+
+    # Relationships
+    tenant = db.relationship("Tenant", backref="agent_config")
+
+    def get_plugins(self) -> list:
+        """解析 plugins JSON 字段"""
+        import json as _json
+        try:
+            return _json.loads(self.plugins) if self.plugins else []
+        except (ValueError, TypeError):
+            return []
+
+    def set_plugins(self, val: list):
+        import json as _json
+        self.plugins = _json.dumps(val)
+
+    def get_tools(self) -> list:
+        """解析 tools JSON 字段"""
+        import json as _json
+        try:
+            return _json.loads(self.tools) if self.tools else []
+        except (ValueError, TypeError):
+            return []
+
+    def set_tools(self, val: list):
+        import json as _json
+        self.tools = _json.dumps(val)
+
+    def get_knowledge_ids(self) -> list:
+        """解析 knowledge_ids JSON 字段"""
+        import json as _json
+        try:
+            return _json.loads(self.knowledge_ids) if self.knowledge_ids else []
+        except (ValueError, TypeError):
+            return []
+
+    def set_knowledge_ids(self, val: list):
+        import json as _json
+        self.knowledge_ids = _json.dumps(val)
+
+    def __repr__(self):
+        return f"<AgentConfig {self.name} @ {self.tenant_id}>"
+
+
+class KnowledgeFile(db.Model):
+    """知识库文件表 — 管理租户上传的知识文件"""
+    __tablename__ = "knowledge_file"
+
+    id = db.Column(db.String(36), primary_key=True, default=_gen_id)
+    tenant_id = db.Column(db.String(36), db.ForeignKey("tenants.id"), nullable=False, index=True)
+    filename = db.Column(db.String(255), nullable=False)
+    file_path = db.Column(db.String(500), nullable=False)
+    file_size = db.Column(db.Integer)
+    file_type = db.Column(db.String(20))  # pdf, txt, md, json, csv
+    chunk_count = db.Column(db.Integer, default=0)
+    status = db.Column(db.String(20), default="pending")  # pending/processing/ready/error
+    error_msg = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, nullable=False, default=_now)
+
+    # Relationships
+    tenant = db.relationship("Tenant", backref="knowledge_files")
+
+    def __repr__(self):
+        return f"<KnowledgeFile {self.filename} @ {self.tenant_id}>"
+
+
 class MemoryChunkRecord(db.Model):
     """记忆块表（对应 PostgresMemoryStorage 创建的 memory_chunks 表）
 

@@ -1,13 +1,12 @@
 # encoding:utf-8
 """
-CowAgent 核心对话引擎 — 通过 Bridge/AgentBridge 调用 CowAgent 原生能力
+CowAgent 核心对话引擎
 
-支持：
-- 多轮对话（基于 CowAgent Agent 的会话管理）
-- 流式响应（SSE）
-- 租户级模型配置覆盖（临时切换全局 config）
-- 用量记录（Token 计数）
-- Agent 模式（工具调用、ReAct 推理、知识库、插件）
+支持两种模式：
+1. AgentFactory 模式（新）— 根据租户 AgentConfig 直接构造独立 Agent 实例
+2. Bridge 模式（旧）— 通过全局 config 覆盖 + Bridge 单例
+
+优先使用 AgentFactory 模式，Bridge 作为 fallback。
 """
 
 import json
@@ -19,7 +18,76 @@ from common.log import logger
 
 
 # ---------------------------------------------------------------------------
-# 租户配置 → CowAgent 全局 config 临时覆盖
+# 模式选择
+# ---------------------------------------------------------------------------
+
+def _use_agent_factory(tenant_id: str) -> bool:
+    """判断是否使用 AgentFactory 模式
+
+    当租户有 AgentConfig 记录时使用 Factory，否则 fallback 到 Bridge。
+    """
+    try:
+        from saas.database import AgentConfig
+        config = AgentConfig.query.filter_by(tenant_id=tenant_id).first()
+        return config is not None
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# AgentFactory 模式对话
+# ---------------------------------------------------------------------------
+
+def _chat_via_factory(tenant_id: str, message: str, session_id: str,
+                      system_prompt: str = None) -> dict:
+    """通过 AgentFactory 执行对话
+
+    流程：
+    1. 获取/创建租户 AgentConfig
+    2. AgentFactory.get_or_create() 获取 Agent 实例
+    3. Agent.run_stream() 执行对话
+    4. 记录用量
+    """
+    from saas.agent_factory import AgentFactory, get_or_create_default_config
+
+    # 获取 AgentConfig（不存在则创建默认配置）
+    config = get_or_create_default_config(tenant_id)
+
+    # 如果请求中指定了 system_prompt，临时覆盖
+    if system_prompt:
+        config.system_prompt = system_prompt
+
+    # 获取或创建 Agent 实例
+    agent = AgentFactory.get_or_create(tenant_id, config)
+
+    # 执行对话
+    try:
+        content = agent.run_stream(message, clear_history=False)
+    except Exception as e:
+        logger.error(f"[ChatEngine] AgentFactory run_stream error: {e}", exc_info=True)
+        content = f"对话引擎错误: {str(e)}"
+
+    # 估算 token 用量
+    prompt_tokens = int(len(message) * 1.5)
+    completion_tokens = int(len(content) * 1.5) if content else 0
+    usage = {
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+    }
+
+    # 记录用量
+    _record_usage(tenant_id, prompt_tokens, completion_tokens)
+
+    return {
+        "session_id": session_id,
+        "content": content or "",
+        "usage": usage,
+        "mode": "agent_factory",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Bridge 模式对话（旧路径，作为 fallback）
 # ---------------------------------------------------------------------------
 
 _config_lock = threading.Lock()
@@ -81,11 +149,7 @@ def _get_tenant_llm_config(tenant_id: str) -> dict:
 
 
 def _apply_tenant_config(tenant_id: str) -> dict:
-    """将租户配置临时应用到 CowAgent 全局 config，返回原始值用于恢复
-
-    CowAgent 的 Bridge/Bot 读取全局 config，SaaS 需要租户隔离。
-    在调用前临时覆盖，调用后恢复。
-    """
+    """将租户配置临时应用到 CowAgent 全局 config，返回原始值用于恢复"""
     from config import conf
 
     tenant_config = _get_tenant_llm_config(tenant_id)
@@ -94,7 +158,7 @@ def _apply_tenant_config(tenant_id: str) -> dict:
     original = {}
     key_map = {
         "model": "model",
-        "api_key": "deepseek_api_key",  # 默认用 deepseek
+        "api_key": "deepseek_api_key",
         "api_base": "deepseek_api_base",
         "temperature": "temperature",
         "max_tokens": "conversation_max_tokens",
@@ -132,7 +196,6 @@ def _apply_tenant_config(tenant_id: str) -> dict:
             if api_base:
                 conf()["open_ai_api_base"] = api_base
         else:
-            # 其他模型也设置 open_ai_api_key 作为兼容 API
             original["open_ai_api_key"] = conf().get("open_ai_api_key")
             original["open_ai_api_base"] = conf().get("open_ai_api_base")
             if api_key:
@@ -140,7 +203,7 @@ def _apply_tenant_config(tenant_id: str) -> dict:
             if api_base:
                 conf()["open_ai_api_base"] = api_base
 
-        # 同步到环境变量（CowAgent 的 bot 会读环境变量）
+        # 同步到环境变量
         if api_key:
             os.environ["OPENAI_API_KEY"] = api_key
             os.environ["DEEPSEEK_API_KEY"] = api_key
@@ -163,21 +226,12 @@ def _restore_config(original: dict):
                 conf().pop(key, None)
 
 
-# ---------------------------------------------------------------------------
-# Bridge 初始化
-# ---------------------------------------------------------------------------
-
 _bridge_instance = None
 _bridge_lock = threading.Lock()
 
 
 def _get_bridge():
-    """获取或初始化 CowAgent Bridge 单例
-
-    Bridge 使用 @singleton 装饰器，多次调用 Bridge() 返回同一实例。
-    每次调用前通过 _apply_tenant_config 切换全局 config，
-    再调用 bridge.reset_bot() 让它根据新 config 重建 bot。
-    """
+    """获取或初始化 CowAgent Bridge 单例"""
     global _bridge_instance
     if _bridge_instance is not None:
         return _bridge_instance
@@ -208,95 +262,30 @@ def _ensure_config_loaded():
         logger.warning(f"[ChatEngine] Config load check: {e}")
 
 
-# ---------------------------------------------------------------------------
-# 用量记录
-# ---------------------------------------------------------------------------
-
-def _record_usage(tenant_id: str, prompt_tokens: int, completion_tokens: int):
-    """记录 Token 用量到数据库（通过 usage.py 的 record_usage，含配额检查）"""
-    try:
-        from saas.api.usage import record_usage
-        total = prompt_tokens + completion_tokens
-        allowed, remaining = record_usage(
-            tenant_id=tenant_id,
-            metric="llm_tokens",
-            value=total,
-            api_key_id=None,
-        )
-        if not allowed:
-            logger.warning(f"[ChatEngine] Quota exceeded for tenant {tenant_id}, tokens={total}")
-    except Exception as e:
-        logger.warning(f"[ChatEngine] Failed to record usage: {e}")
-
-
-# ---------------------------------------------------------------------------
-# 对话 API — 通过 CowAgent Bridge
-# ---------------------------------------------------------------------------
-
-def chat(
-    tenant_id: str,
-    message: str,
-    session_id: str = None,
-    system_prompt: str = None,
-    stream: bool = False,
-) -> dict:
-    """通过 CowAgent Bridge 执行对话
-
-    使用 CowAgent 的 AgentBridge，支持：
-    - Agent 模式（工具调用、多步推理）
-    - 知识库 / RAG
-    - 插件系统
-    - 多模型支持
-
-    Args:
-        tenant_id: 租户 ID
-        message: 用户消息
-        session_id: 会话 ID（为空则新建，格式: tenant_{tenant_id}_{uuid}）
-        system_prompt: 系统提示词（覆盖租户默认）
-        stream: 是否流式
-
-    Returns:
-        非流式: {"session_id": str, "content": str, "usage": {...}}
-        流式: 返回生成器
-    """
-    if not session_id:
-        session_id = f"tenant_{tenant_id}_{uuid.uuid4().hex[:8]}"
-
-    # 追踪租户会话
-    _track_session(tenant_id, session_id)
-
-    # 确保配置已加载
+def _chat_via_bridge(tenant_id: str, message: str, session_id: str,
+                     system_prompt: str = None) -> dict:
+    """通过 Bridge 执行对话（旧路径）"""
     _ensure_config_loaded()
-
-    # 临时应用租户配置
     original_config = _apply_tenant_config(tenant_id)
 
     try:
         bridge = _get_bridge()
-
-        # 重置 bot 路由，让它根据当前租户配置重建 bot
-        # （因为 _apply_tenant_config 已切换了全局 config）
         bridge.reset_bot()
 
-        # 构建 CowAgent Context
         from bridge.context import Context, ContextType
         context = Context(ContextType.TEXT, content=message)
         context.kwargs["session_id"] = session_id
         context.kwargs["channel_type"] = "saas_api"
 
-        # 设置系统提示词（如果请求中提供，覆盖租户默认）
-        # 注意：租户默认的 system_prompt 已在 _apply_tenant_config 中设置到 character_desc
         if system_prompt:
             from config import conf
             conf()["character_desc"] = system_prompt
 
         try:
-            # 判断是否使用 Agent 模式
             from config import conf
             use_agent = conf().get("agent", True)
 
             if use_agent:
-                # Agent 模式 — 通过 AgentBridge（支持工具调用、知识库等）
                 reply = bridge.fetch_agent_reply(
                     query=message,
                     context=context,
@@ -304,10 +293,8 @@ def chat(
                     clear_history=False,
                 )
             else:
-                # 普通对话模式 — 通过 Bridge 直接调 Bot
                 reply = bridge.fetch_reply_content(query=message, context=context)
 
-            # 提取回复内容
             from bridge.reply import ReplyType
             if reply.type == ReplyType.ERROR:
                 content = f"Error: {reply.content}"
@@ -320,8 +307,6 @@ def chat(
             else:
                 content = str(reply.content) if reply.content else ""
 
-            # 估算 token 用量（CowAgent 不直接返回 token 数）
-            # 粗略估算：中文约 1.5 token/字，英文约 0.75 token/word
             prompt_tokens = int(len(message) * 1.5)
             completion_tokens = int(len(content) * 1.5)
             usage = {
@@ -329,7 +314,6 @@ def chat(
                 "completion_tokens": completion_tokens,
             }
 
-            # 记录用量
             _record_usage(tenant_id, prompt_tokens, completion_tokens)
 
             return {
@@ -352,15 +336,78 @@ def chat(
             "mode": "error",
         }
     finally:
-        # 恢复全局配置
         _restore_config(original_config)
 
 
 # ---------------------------------------------------------------------------
-# 会话管理 — 基于 AgentBridge 的内部会话管理 + 租户会话追踪
+# 用量记录
 # ---------------------------------------------------------------------------
 
-# 租户会话追踪：tenant_id -> set of session_ids
+def _record_usage(tenant_id: str, prompt_tokens: int, completion_tokens: int):
+    """记录 Token 用量到数据库（通过 usage.py 的 record_usage，含配额检查）"""
+    try:
+        from saas.api.usage import record_usage
+        total = prompt_tokens + completion_tokens
+        allowed, remaining = record_usage(
+            tenant_id=tenant_id,
+            metric="llm_tokens",
+            value=total,
+            api_key_id=None,
+        )
+        if not allowed:
+            logger.warning(f"[ChatEngine] Quota exceeded for tenant {tenant_id}, tokens={total}")
+    except Exception as e:
+        logger.warning(f"[ChatEngine] Failed to record usage: {e}")
+
+
+# ---------------------------------------------------------------------------
+# 统一对话入口
+# ---------------------------------------------------------------------------
+
+def chat(
+    tenant_id: str,
+    message: str,
+    session_id: str = None,
+    system_prompt: str = None,
+    stream: bool = False,
+) -> dict:
+    """执行对话 — 自动选择 AgentFactory 或 Bridge 模式
+
+    优先使用 AgentFactory（租户有 AgentConfig 时），
+    否则 fallback 到 Bridge 模式。
+
+    Args:
+        tenant_id: 租户 ID
+        message: 用户消息
+        session_id: 会话 ID（为空则新建）
+        system_prompt: 系统提示词（覆盖租户默认）
+        stream: 是否流式
+
+    Returns:
+        {"session_id": str, "content": str, "usage": {...}, "mode": str}
+    """
+    if not session_id:
+        session_id = f"tenant_{tenant_id}_{uuid.uuid4().hex[:8]}"
+
+    # 追踪租户会话
+    _track_session(tenant_id, session_id)
+
+    # 尝试 AgentFactory 模式
+    if _use_agent_factory(tenant_id):
+        try:
+            return _chat_via_factory(tenant_id, message, session_id, system_prompt)
+        except Exception as e:
+            logger.warning(f"[ChatEngine] AgentFactory failed, falling back to Bridge: {e}")
+            # Fallback 到 Bridge
+
+    # Bridge 模式
+    return _chat_via_bridge(tenant_id, message, session_id, system_prompt)
+
+
+# ---------------------------------------------------------------------------
+# 会话管理
+# ---------------------------------------------------------------------------
+
 _tenant_sessions = {}
 _tenant_sessions_lock = threading.Lock()
 
@@ -376,18 +423,16 @@ def _track_session(tenant_id: str, session_id: str):
 def list_sessions(tenant_id: str) -> list:
     """列出租户的活跃会话"""
     sessions = []
-    # 从租户追踪中获取
     with _tenant_sessions_lock:
         tracked = _tenant_sessions.get(tenant_id, set())
     for sid in tracked:
-        # 检查 AgentBridge 中是否还存在
         try:
             bridge = _get_bridge()
             agent_bridge = bridge.get_agent_bridge()
             if sid in agent_bridge.agents:
                 sessions.append(sid)
         except Exception:
-            sessions.append(sid)  # 无法检查时也返回
+            sessions.append(sid)
     return sessions
 
 
