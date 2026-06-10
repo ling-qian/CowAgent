@@ -209,6 +209,7 @@ class AgentFactory:
 
     _instances: Dict[str, object] = {}      # tenant_id → Agent
     _versions: Dict[str, int] = {}           # tenant_id → config_version
+    _knowledge_cache: Dict[str, tuple] = {}  # tenant_id → (config_version, knowledge_text)
     _lock = threading.Lock()
 
     # 最大缓存 Agent 实例数，超出时 LRU 淘汰
@@ -405,10 +406,16 @@ class AgentFactory:
         - 将知识文本拼接到 system prompt 末尾
         - 限制总量以适配上下文窗口
         - 未来可升级为 RAG 检索方案
+        - 带 config_version 缓存，避免重复磁盘 I/O
         """
         knowledge_ids = config.get_knowledge_ids()
         if not knowledge_ids:
             return ""
+
+        # 检查知识缓存
+        cached = cls._knowledge_cache.get(config.tenant_id)
+        if cached and cached[0] == config.config_version:
+            return cached[1]
 
         # 获取计划限制
         tenant_plan = cls._get_tenant_plan(config.tenant_id)
@@ -429,6 +436,8 @@ class AgentFactory:
             if context:
                 logger.info(f"[AgentFactory] Loaded knowledge context for tenant "
                             f"{config.tenant_id}: {len(context)} chars")
+            # 缓存知识上下文
+            cls._knowledge_cache[config.tenant_id] = (config.config_version, context)
             return context
         except Exception as e:
             logger.warning(f"[AgentFactory] Failed to load knowledge: {e}")
@@ -440,6 +449,7 @@ class AgentFactory:
         with cls._lock:
             cls._instances.pop(tenant_id, None)
             cls._versions.pop(tenant_id, None)
+            cls._knowledge_cache.pop(tenant_id, None)
             logger.info(f"[AgentFactory] Destroyed agent for tenant {tenant_id}")
 
     @classmethod

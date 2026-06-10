@@ -89,7 +89,10 @@ def _is_internal_url(url: str) -> bool:
             try:
                 ip_str = socket.getaddrinfo(hostname, None, socket.AF_INET6)[0][4][0]
             except socket.gaierror:
-                return False  # 无法解析，放行（可能是无效域名）
+                # 无法解析域名 — 可能是尚未配置的公网域名
+                # 记录警告但不阻止（实际请求时 DNS 会再次解析）
+                logger.warning(f"[CustomTool] Cannot resolve hostname: {hostname}")
+                return False
 
         ip = ipaddress.ip_address(ip_str)
         for network in _BLOCKED_NETWORKS:
@@ -108,9 +111,9 @@ def _validate_url(url: str) -> tuple:
     """
     parsed = urlparse(url)
     if parsed.scheme not in ALLOWED_SCHEMES:
-        # 开发环境允许 http
+        # 开发环境允许 http，但生产环境应仅允许 https
         if parsed.scheme == "http":
-            pass  # 放行但记录警告
+            logger.warning(f"[CustomTool] HTTP scheme used (not HTTPS): {url}")
         else:
             return False, f"URL scheme '{parsed.scheme}' not allowed, use HTTPS"
     if _is_internal_url(url):
@@ -278,6 +281,7 @@ class CustomHttpTool(BaseTool):
             request_kwargs = {
                 "timeout": REQUEST_TIMEOUT,
                 "headers": headers,
+                "allow_redirects": False,  # 禁止自动跟随重定向（防止 SSRF 绕过）
             }
 
             if method == "GET":
@@ -303,6 +307,13 @@ class CustomHttpTool(BaseTool):
             # 执行请求
             logger.info(f"[CustomTool] Executing {method} {url}")
             response = requests.request(method, url, **request_kwargs)
+
+            # 检查重定向（allow_redirects=False 时 3xx 不会自动跟随）
+            if 300 <= response.status_code < 400:
+                redirect_url = response.headers.get("Location", "")
+                return ToolResult.fail(
+                    f"Redirects not allowed (HTTP {response.status_code} -> {redirect_url})"
+                )
 
             # 检查响应大小
             if len(response.content) > MAX_RESPONSE_SIZE:
