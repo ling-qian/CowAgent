@@ -32,4 +32,4 @@ VOLUME /data
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=30s \
     CMD curl -f http://localhost:7860/health || exit 1
 
-CMD ["python", "hf_spaces_app.py"]
+CMD ["gunicorn", "hf_spaces_app:saas_app", "--bind", "0.0.0.0:7860", "--workers", "2", "--timeout", "120", "--access-logfile", "-"]

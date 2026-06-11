@@ -20,6 +20,10 @@ flasgger>=0.9.7
 prometheus_client>=0.17.0
 psycopg2-binary>=2.9.0
 pgvector>=0.2.0
+gunicorn>=21.2.0
+
+# 知识库文件解析
+PyPDF2>=3.0.0
 
 # wechatcom & wechatmp
 wechatpy

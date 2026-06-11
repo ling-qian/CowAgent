@@ -5,6 +5,10 @@ Hugging Face Spaces 入口脚本
 HF Spaces 只暴露 7860 端口，此脚本：
 1. 启动 SaaS Flask API 在 7860 端口
 2. 在后台线程启动 CowAgent 主服务（web channel on 8080）
+
+启动方式：
+  - 开发：python hf_spaces_app.py
+  - 生产：gunicorn hf_spaces_app:saas_app --bind 0.0.0.0:7860 --workers 2
 """
 
 import os
@@ -22,42 +26,53 @@ os.makedirs(WORKSPACE, exist_ok=True)
 # 修复 Neon 连接串：channel_binding 不被 psycopg2 支持
 _db_url = os.environ.get("DATABASE_URL", "")
 if "channel_binding=" in _db_url:
-    # 移除 channel_binding 参数
     import re
     _db_url = re.sub(r'[&?]channel_binding=[^&]*', '', _db_url)
     os.environ["DATABASE_URL"] = _db_url
 
 
-def main():
-    """启动 SaaS API 服务"""
-    from flask import Flask, jsonify
+def _create_app():
+    """创建并配置 Flask 应用"""
+    from flask import Flask, jsonify, send_from_directory
     from flask_cors import CORS
 
-    saas_app = Flask(__name__)
-    CORS(saas_app)
+    app = Flask(__name__)
+    CORS(app)
+
+    # 保存全局引用供 AgentFactory 等模块使用
+    import saas as _saas_mod
+    _saas_mod.set_flask_app(app)
+
+    # 全局 JSON 错误处理器
+    @app.errorhandler(400)
+    @app.errorhandler(404)
+    @app.errorhandler(405)
+    @app.errorhandler(500)
+    def json_error_handler(error):
+        return jsonify({"error": error.description if hasattr(error, 'description') else str(error)}), error.code if hasattr(error, 'code') else 500
 
     database_url = os.environ.get("DATABASE_URL", "")
     if not database_url:
-        print("[HF] ERROR: DATABASE_URL not set!", file=sys.stderr)
-        sys.exit(1)
+        print("[HF] WARNING: DATABASE_URL not set — API will not work", file=sys.stderr)
 
     # 初始化数据库
     _db_error = None
-    try:
-        from saas.database import init_db
-        init_db(app=saas_app, database_uri=database_url)
-        print("[HF] Database initialized OK")
-    except Exception as e:
-        _db_error = str(e)
-        print(f"[HF] Database init error: {e}", file=sys.stderr)
-        traceback.print_exc()
+    if database_url:
+        try:
+            from saas.database import init_db
+            init_db(app=app, database_uri=database_url)
+            print("[HF] Database initialized OK")
+        except Exception as e:
+            _db_error = str(e)
+            print(f"[HF] Database init error: {e}", file=sys.stderr)
+            traceback.print_exc()
 
     # 中间件
     try:
         from saas.middleware import TenantMiddleware
         from saas.rate_limit import RateLimitMiddleware
-        TenantMiddleware(saas_app)
-        RateLimitMiddleware(saas_app)
+        TenantMiddleware(app)
+        RateLimitMiddleware(app)
     except Exception as e:
         print(f"[HF] Middleware error: {e}", file=sys.stderr)
 
@@ -71,20 +86,28 @@ def main():
         from saas.api.gdpr import gdpr_bp
         from saas.api.im_channels import bp as im_channels_bp
         from saas.api.chat import chat_bp
+        from saas.api.agent import agent_bp
+        from saas.api.knowledge import knowledge_bp
+        from saas.api.tools import tools_bp
 
-        saas_app.register_blueprint(tenants_bp, url_prefix="/api/tenants")
-        saas_app.register_blueprint(keys_bp, url_prefix="/api/keys")
-        saas_app.register_blueprint(usage_bp, url_prefix="/api/usage")
-        saas_app.register_blueprint(billing_bp, url_prefix="/api/billing")
-        saas_app.register_blueprint(sso_bp, url_prefix="/api/auth")
-        saas_app.register_blueprint(audit_bp, url_prefix="/api/audit")
-        saas_app.register_blueprint(webhooks_bp, url_prefix="/api/webhooks")
-        saas_app.register_blueprint(plugins_bp, url_prefix="/api/plugins")
-        saas_app.register_blueprint(gdpr_bp, url_prefix="/api/gdpr")
-        saas_app.register_blueprint(im_channels_bp, url_prefix="/api/im-channels")
-        saas_app.register_blueprint(chat_bp, url_prefix="/api/chat")
-        saas_app.register_blueprint(health_bp)
-        print("[HF] All blueprints registered OK")
+        app.register_blueprint(tenants_bp, url_prefix="/api/tenants")
+        app.register_blueprint(keys_bp, url_prefix="/api/keys")
+        app.register_blueprint(usage_bp, url_prefix="/api/usage")
+        app.register_blueprint(billing_bp, url_prefix="/api/billing")
+        app.register_blueprint(sso_bp, url_prefix="/api/auth")
+        app.register_blueprint(audit_bp, url_prefix="/api/audit")
+        app.register_blueprint(webhooks_bp, url_prefix="/api/webhooks")
+        app.register_blueprint(plugins_bp, url_prefix="/api/plugins")
+        app.register_blueprint(gdpr_bp, url_prefix="/api/gdpr")
+        app.register_blueprint(im_channels_bp, url_prefix="/api/im-channels")
+        app.register_blueprint(chat_bp, url_prefix="/api/chat")
+        app.register_blueprint(health_bp)
+        # Agent 配置蓝图
+        app.register_blueprint(agent_bp, url_prefix="/api/agent")
+        app.register_blueprint(knowledge_bp, url_prefix="/api/agent/knowledge")
+        # 自定义工具蓝图
+        app.register_blueprint(tools_bp, url_prefix="/api/agent/tools")
+        print("[HF] All blueprints registered OK (including agent/knowledge/tools)")
     except Exception as e:
         _blueprints_ok = False
         print(f"[HF] Blueprint registration error: {e}", file=sys.stderr)
@@ -94,20 +117,34 @@ def main():
     try:
         from flasgger import Swagger
         from saas.api.docs import SWAGGER_CONFIG, SWAGGER_TEMPLATE
-        Swagger(saas_app, config=SWAGGER_CONFIG, template=SWAGGER_TEMPLATE)
+        Swagger(app, config=SWAGGER_CONFIG, template=SWAGGER_TEMPLATE)
     except Exception:
         pass
 
     # Prometheus
     try:
         from saas.metrics import metrics_middleware, create_metrics_blueprint
-        saas_app.register_blueprint(create_metrics_blueprint())
-        metrics_middleware(saas_app)
+        app.register_blueprint(create_metrics_blueprint())
+        metrics_middleware(app)
     except Exception:
         pass
 
+    # ---- 前端静态页面 ----
+    _web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "channel", "web")
+
+    @app.route("/chat")
+    @app.route("/agent-builder")
+    def serve_chat_html():
+        """Agent Builder / Chat 页面"""
+        return send_from_directory(_web_dir, "chat.html")
+
+    @app.route("/static/<path:filename>")
+    def serve_static(filename):
+        """静态资源（JS/CSS/图片）"""
+        return send_from_directory(os.path.join(_web_dir, "static"), filename)
+
     # 根路径 — HTML 欢迎页
-    @saas_app.route("/")
+    @app.route("/")
     def index():
         return """<!DOCTYPE html>
 <html lang="zh-CN">
@@ -145,6 +182,16 @@ def main():
   <p class="subtitle">AI Agent 多租户企业级平台</p>
   <div class="status"><span class="dot"></span> 服务运行中</div>
   <div class="links">
+    <a class="link-card" href="/chat">
+      <div class="icon">🤖</div>
+      <div class="title">Agent Builder</div>
+      <div class="desc">创建和配置你的 AI Agent</div>
+    </a>
+    <a class="link-card" href="/chat">
+      <div class="icon">🎛️</div>
+      <div class="title">管理控制台</div>
+      <div class="desc">租户管理与 Agent 配置</div>
+    </a>
     <a class="link-card" href="/apidocs">
       <div class="icon">📖</div>
       <div class="title">API 文档</div>
@@ -154,11 +201,6 @@ def main():
       <div class="icon">💚</div>
       <div class="title">健康检查</div>
       <div class="desc">服务状态与数据库连接</div>
-    </a>
-    <a class="link-card" href="/metrics">
-      <div class="icon">📊</div>
-      <div class="title">监控指标</div>
-      <div class="desc">Prometheus Metrics</div>
     </a>
   </div>
   <div class="quick-start">
@@ -178,44 +220,22 @@ curl /api/billing/quotas -H "X-API-Key: sk-xxx"</pre>
   <div class="footer">
     Powered by <a href="https://github.com/zhayujie/CowAgent">CowAgent</a> ·
     PostgreSQL + pgvector ·
-    <a href="https://huggingface.co/spaces/Chace01/cowagent-saas">HF Space</a>
+    <a href="https://huggingface.co/spaces">HF Spaces</a>
   </div>
 </div>
 </body>
 </html>"""
 
     # 调试路由：查看启动状态
-    @saas_app.route("/debug")
+    @app.route("/debug")
     def debug_info():
-        rules = [str(rule) for rule in saas_app.url_map.iter_rules()]
+        rules = [str(rule) for rule in app.url_map.iter_rules()]
         return jsonify({
             "db_error": _db_error,
             "blueprints_ok": _blueprints_ok,
             "database_url_set": bool(database_url),
             "routes_count": len(rules),
             "routes": sorted(rules),
-        })
-
-    # 调试路由：测试 API Key 查询
-    @saas_app.route("/debug/apikey-test")
-    def debug_apikey_test():
-        from flask import request
-        from saas.database import ApiKey
-        from saas.middleware import _hash_api_key
-        test_key = request.args.get("key", "")
-        if not test_key:
-            return jsonify({"error": "pass ?key=sk-xxx"})
-        key_hash = _hash_api_key(test_key)
-        record = ApiKey.query.filter_by(key_hash=key_hash, is_active=True).first()
-        if record:
-            return jsonify({"found": True, "tenant_id": record.tenant_id, "key_prefix": record.key_prefix})
-        # List all keys for debug
-        all_keys = ApiKey.query.all()
-        return jsonify({
-            "found": False,
-            "key_hash": key_hash,
-            "total_keys": len(all_keys),
-            "keys": [{"prefix": k.key_prefix, "active": k.is_active} for k in all_keys],
         })
 
     # 后台启动 CowAgent 主服务
@@ -237,10 +257,13 @@ curl /api/billing/quotas -H "X-API-Key: sk-xxx"</pre>
     except Exception:
         pass
 
+    return app
+
+
+# 模块级 Flask 实例 — gunicorn 通过 hf_spaces_app:saas_app 导入
+saas_app = _create_app()
+
+if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
     print(f"[HF] Starting SaaS API on port {port}")
     saas_app.run(host="0.0.0.0", port=port, debug=False)
-
-
-if __name__ == "__main__":
-    main()
