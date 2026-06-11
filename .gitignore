@@ -40,3 +40,16 @@ admin-panel/.vite/
 # Data
 data/
 cow/
+
+# Binary files (use CDN or XET storage for HF Spaces)
+*.woff2
+*.woff
+*.ttf
+*.eot
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.ico
+*.node
+*.pkl
