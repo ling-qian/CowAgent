@@ -409,6 +409,141 @@ def list_providers():
         available.append({
             "provider": provider,
             "configured": bool(client_id),
-            "name": provider.capitalize(),
+            "authorize_url": f"/api/auth/sso/{provider}",
         })
     return jsonify({"providers": available})
+
+
+# ---------------------------------------------------------------------------
+# 邮箱登录 / 注册
+# ---------------------------------------------------------------------------
+
+@sso_bp.route("/register", methods=["POST"])
+def email_register():
+    """邮箱注册 — 创建租户 + 用户 + API Key"""
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+
+    if not name or len(name) > 100:
+        return jsonify({"error": "name is required (max 100 chars)"}), 400
+    if not email or "@" not in email:
+        return jsonify({"error": "valid email is required"}), 400
+    if len(password) < 6:
+        return jsonify({"error": "password must be at least 6 characters"}), 400
+
+    # 检查邮箱是否已注册
+    existing = User.query.filter_by(email=email).first()
+    if existing:
+        return jsonify({"error": "email already registered"}), 409
+
+    # 生成 slug
+    import re
+    slug = re.sub(r'[^a-z0-9-]', '-', name.lower())[:40].strip('-') or "team"
+
+    # 检查 slug 冲突
+    base_slug = slug
+    counter = 1
+    while Tenant.query.filter_by(slug=slug).first():
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+
+    # 创建租户
+    tenant = Tenant(
+        name=name,
+        slug=slug,
+        plan="free",
+        email=email,
+    )
+    db.session.add(tenant)
+    db.session.flush()
+
+    # 创建用户
+    pw_hash = hashlib.sha256(password.encode()).hexdigest()
+    user = User(
+        tenant_id=tenant.id,
+        email=email,
+        name=name,
+        password_hash=pw_hash,
+        role="owner",
+    )
+    db.session.add(user)
+    db.session.flush()
+
+    # 创建 API Key
+    raw_key = f"sk-{secrets.token_hex(24)}"
+    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+    key_prefix = raw_key[:8]
+    api_key = ApiKey(
+        tenant_id=tenant.id,
+        name="Default Key",
+        key_hash=key_hash,
+        key_prefix=key_prefix,
+    )
+    db.session.add(api_key)
+    db.session.commit()
+
+    audit_log("tenant.register", tenant_id=tenant.id, details={"email": email, "method": "email"})
+
+    return jsonify({
+        "api_key": raw_key,
+        "tenant_id": tenant.id,
+        "tenant_slug": slug,
+        "email": email,
+    }), 201
+
+
+@sso_bp.route("/login", methods=["POST"])
+def email_login():
+    """邮箱登录 — 验证密码，返回 API Key"""
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+
+    if not email or not password:
+        return jsonify({"error": "email and password are required"}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"error": "invalid email or password"}), 401
+
+    pw_hash = hashlib.sha256(password.encode()).hexdigest()
+    if user.password_hash != pw_hash:
+        return jsonify({"error": "invalid email or password"}), 401
+
+    # 查找或创建 API Key
+    api_key = ApiKey.query.filter_by(tenant_id=user.tenant_id, is_active=True).first()
+    if not api_key:
+        raw_key = f"sk-{secrets.token_hex(24)}"
+        key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+        key_prefix = raw_key[:8]
+        api_key = ApiKey(
+            tenant_id=user.tenant_id,
+            name="Default Key",
+            key_hash=key_hash,
+            key_prefix=key_prefix,
+        )
+        db.session.add(api_key)
+        db.session.commit()
+    else:
+        # 已有的 key 无法反推 raw_key，需要创建新的 session key
+        raw_key = f"sk-{secrets.token_hex(24)}"
+        key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+        key_prefix = raw_key[:8]
+        session_key = ApiKey(
+            tenant_id=user.tenant_id,
+            name=f"Session ({email})",
+            key_hash=key_hash,
+            key_prefix=key_prefix,
+        )
+        db.session.add(session_key)
+        db.session.commit()
+
+    audit_log("user.login", tenant_id=user.tenant_id, details={"email": email, "method": "email"})
+
+    return jsonify({
+        "api_key": raw_key,
+        "tenant_id": user.tenant_id,
+        "email": email,
+    })

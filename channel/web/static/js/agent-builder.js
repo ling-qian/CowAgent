@@ -74,6 +74,11 @@ async function abFetch(url, opts = {}) {
     const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
     if (token) headers['Authorization'] = `Bearer ${token}`;
     const resp = await fetch(url, { ...opts, headers });
+    if (resp.status === 401) {
+        // Token 过期或无效，触发退出登录
+        if (typeof _saasLogout === 'function') _saasLogout();
+        throw new Error('认证已过期，请重新登录');
+    }
     if (!resp.ok) {
         const err = await resp.json().catch(() => ({ error: resp.statusText }));
         throw new Error(err.error || `HTTP ${resp.status}`);

@@ -7769,20 +7769,31 @@ function renderKnowledgeGraph(container, nodes, links) {
 }
 
 // =====================================================================
-// Authentication
+// Authentication — SaaS Mode
 // =====================================================================
-function toggleLoginPassword() {
-    const input = document.getElementById('login-password');
-    const icon = document.querySelector('#login-toggle-pwd i');
-    if (input.type === 'password') {
-        input.type = 'text';
-        icon.classList.replace('fa-eye', 'fa-eye-slash');
-    } else {
-        input.type = 'password';
-        icon.classList.replace('fa-eye-slash', 'fa-eye');
-    }
+
+function _saasSaveKey(apiKey, tenantId) {
+    localStorage.setItem('cow_api_key', apiKey);
+    if (tenantId) localStorage.setItem('cow_tenant_id', tenantId);
 }
-window.toggleLoginPassword = toggleLoginPassword;
+
+function _saasGetKey() {
+    return localStorage.getItem('cow_api_key');
+}
+
+function _saasLogout() {
+    localStorage.removeItem('cow_api_key');
+    localStorage.removeItem('cow_tenant_id');
+    showLoginScreen();
+}
+
+function _saasOnLoginSuccess(apiKey, tenantId) {
+    _saasSaveKey(apiKey, tenantId);
+    const overlay = document.getElementById('login-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    initApp();
+}
 
 function showLoginScreen() {
     const overlay = document.getElementById('login-overlay');
@@ -7790,52 +7801,163 @@ function showLoginScreen() {
     overlay.classList.remove('hidden');
     document.getElementById('app').classList.add('hidden');
 
-    const subtitle = document.getElementById('login-subtitle');
-    const loginBtn = document.getElementById('login-btn');
-    if (currentLang === 'en') {
-        subtitle.textContent = 'Enter password to access the console';
-        loginBtn.textContent = 'Login';
-    } else {
-        subtitle.textContent = '请输入密码以访问控制台';
-        loginBtn.textContent = '登录';
-    }
+    // Reset forms
+    const loginForm = document.getElementById('saas-login-form');
+    const registerForm = document.getElementById('saas-register-form');
+    const regSuccess = document.getElementById('saas-reg-success');
+    if (loginForm) loginForm.classList.remove('hidden');
+    if (registerForm) registerForm.classList.add('hidden');
+    if (regSuccess) regSuccess.classList.add('hidden');
 
-    const form = document.getElementById('login-form');
-    const pwdInput = document.getElementById('login-password');
-    pwdInput.focus();
+    const emailInput = document.getElementById('saas-email');
+    if (emailInput) emailInput.focus();
+}
 
-    form.onsubmit = function(e) {
-        e.preventDefault();
-        const pwd = pwdInput.value;
-        if (!pwd) return;
-        const btn = document.getElementById('login-btn');
-        const errEl = document.getElementById('login-error');
-        btn.disabled = true;
+function _initSaasLoginHandlers() {
+    // Toggle login / register forms
+    const toggleReg = document.getElementById('saas-toggle-register');
+    const toggleLogin = document.getElementById('saas-toggle-login');
+    const loginForm = document.getElementById('saas-login-form');
+    const registerForm = document.getElementById('saas-register-form');
+
+    if (toggleReg) toggleReg.onclick = function() {
+        loginForm.classList.add('hidden');
+        registerForm.classList.remove('hidden');
+        document.getElementById('saas-reg-name').focus();
+    };
+    if (toggleLogin) toggleLogin.onclick = function() {
+        registerForm.classList.add('hidden');
+        loginForm.classList.remove('hidden');
+        document.getElementById('saas-email').focus();
+    };
+
+    // Email + password login
+    const loginBtn = document.getElementById('saas-login-btn');
+    if (loginBtn) loginBtn.onclick = function() {
+        const email = (document.getElementById('saas-email').value || '').trim();
+        const password = document.getElementById('saas-password').value || '';
+        const errEl = document.getElementById('saas-login-error');
+        if (!email || !password) {
+            errEl.textContent = '请输入邮箱和密码';
+            errEl.classList.remove('hidden');
+            return;
+        }
         errEl.classList.add('hidden');
+        loginBtn.disabled = true;
 
-        fetch('/auth/login', {
+        fetch('/api/auth/login', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({password: pwd})
+            body: JSON.stringify({email, password})
         }).then(r => r.json()).then(data => {
-            if (data.status === 'success') {
-                overlay.classList.add('hidden');
-                document.getElementById('app').classList.remove('hidden');
-                initApp();
+            if (data.api_key) {
+                _saasOnLoginSuccess(data.api_key, data.tenant_id);
             } else {
-                errEl.textContent = currentLang === 'zh' ? '密码错误' : 'Wrong password';
+                errEl.textContent = data.error || '登录失败';
                 errEl.classList.remove('hidden');
-                pwdInput.value = '';
-                pwdInput.focus();
             }
-            btn.disabled = false;
+            loginBtn.disabled = false;
         }).catch(() => {
-            errEl.textContent = currentLang === 'zh' ? '网络错误，请重试' : 'Network error, please retry';
+            errEl.textContent = '网络错误，请重试';
             errEl.classList.remove('hidden');
-            btn.disabled = false;
+            loginBtn.disabled = false;
         });
-        return false;
     };
+
+    // API Key login
+    const keyLoginBtn = document.getElementById('saas-key-login-btn');
+    if (keyLoginBtn) keyLoginBtn.onclick = function() {
+        const apiKey = (document.getElementById('saas-api-key').value || '').trim();
+        const errEl = document.getElementById('saas-login-error');
+        if (!apiKey) {
+            errEl.textContent = '请输入 API Key';
+            errEl.classList.remove('hidden');
+            return;
+        }
+        errEl.classList.add('hidden');
+        keyLoginBtn.disabled = true;
+
+        // Validate key by calling /api/tenants/me
+        fetch('/api/tenants/me', {
+            headers: {'Authorization': 'Bearer ' + apiKey}
+        }).then(r => {
+            if (r.ok) return r.json();
+            throw new Error('Invalid API Key');
+        }).then(data => {
+            _saasOnLoginSuccess(apiKey, data.id || data.tenant_id);
+        }).catch(() => {
+            errEl.textContent = 'API Key 无效';
+            errEl.classList.remove('hidden');
+            keyLoginBtn.disabled = false;
+        });
+    };
+
+    // Register
+    const regBtn = document.getElementById('saas-register-btn');
+    if (regBtn) regBtn.onclick = function() {
+        const name = (document.getElementById('saas-reg-name').value || '').trim();
+        const email = (document.getElementById('saas-reg-email').value || '').trim();
+        const password = document.getElementById('saas-reg-password').value || '';
+        const errEl = document.getElementById('saas-reg-error');
+        if (!name || !email || !password) {
+            errEl.textContent = '请填写所有字段';
+            errEl.classList.remove('hidden');
+            return;
+        }
+        if (password.length < 6) {
+            errEl.textContent = '密码至少6位';
+            errEl.classList.remove('hidden');
+            return;
+        }
+        errEl.classList.add('hidden');
+        regBtn.disabled = true;
+
+        fetch('/api/auth/register', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name, email, password})
+        }).then(r => r.json()).then(data => {
+            if (data.api_key) {
+                // Show success with API Key
+                document.getElementById('saas-register-form').classList.add('hidden');
+                document.getElementById('saas-reg-success').classList.remove('hidden');
+                document.getElementById('saas-reg-api-key').textContent = data.api_key;
+                _saasSaveKey(data.api_key, data.tenant_id);
+            } else {
+                errEl.textContent = data.error || '注册失败';
+                errEl.classList.remove('hidden');
+            }
+            regBtn.disabled = false;
+        }).catch(() => {
+            errEl.textContent = '网络错误，请重试';
+            errEl.classList.remove('hidden');
+            regBtn.disabled = false;
+        });
+    };
+
+    // Continue after registration
+    const continueBtn = document.getElementById('saas-reg-continue-btn');
+    if (continueBtn) continueBtn.onclick = function() {
+        _saasOnLoginSuccess(_saasGetKey(), localStorage.getItem('cow_tenant_id'));
+    };
+
+    // Enter key support
+    ['saas-email', 'saas-password'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') loginBtn.click();
+        });
+    });
+    ['saas-reg-name', 'saas-reg-email', 'saas-reg-password'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') regBtn.click();
+        });
+    });
+    const apiKeyInput = document.getElementById('saas-api-key');
+    if (apiKeyInput) apiKeyInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') keyLoginBtn.click();
+    });
 }
 
 // Intercept 401 responses globally to show login screen on session expiry
@@ -7844,8 +7966,8 @@ window.fetch = function(...args) {
     return _originalFetch.apply(this, args).then(response => {
         if (response.status === 401) {
             const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
-            if (!url.startsWith('/auth/')) {
-                showLoginScreen();
+            if (!url.startsWith('/api/auth/')) {
+                _saasLogout();
             }
         }
         return response;
@@ -7857,18 +7979,13 @@ function initApp() {
     _applyInputTooltips();
     _restoreSessionPanel();
 
-    fetch('/api/knowledge/list').then(r => r.json()).then(data => {
-        if (data.status === 'success') {
-            _knowledgeTreeData = data.tree || [];
-            _knowledgeRootFiles = data.root_files || [];
-        }
-    }).catch(() => {});
-
     fetch('/api/version').then(r => r.json()).then(data => {
         APP_VERSION = `v${data.version}`;
-        document.getElementById('sidebar-version').textContent = `CowAgent ${APP_VERSION}`;
+        const el = document.getElementById('sidebar-version');
+        if (el) el.textContent = `CowAgent ${APP_VERSION}`;
     }).catch(() => {
-        document.getElementById('sidebar-version').textContent = 'CowAgent';
+        const el = document.getElementById('sidebar-version');
+        if (el) el.textContent = 'CowAgent SaaS';
     });
     chatInput.focus();
 }
@@ -7879,15 +7996,42 @@ function initApp() {
 applyTheme();
 applyI18n();
 
-fetch('/auth/check').then(r => r.json()).then(data => {
-    if (data.auth_required && !data.authenticated) {
-        showLoginScreen();
-    } else {
-        initApp();
+// SaaS 初始化：检查认证状态
+(function saasBootstrap() {
+    // 1. 解析 URL 参数中的 api_key（SSO 回调）
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlApiKey = urlParams.get('api_key');
+    const urlTenantId = urlParams.get('tenant_id');
+    if (urlApiKey) {
+        _saasSaveKey(urlApiKey, urlTenantId);
+        // 清除 URL 参数，避免泄露
+        window.history.replaceState({}, document.title, window.location.pathname);
     }
-}).catch(() => {
-    initApp();
-});
+
+    // 2. 初始化登录事件处理器
+    _initSaasLoginHandlers();
+
+    // 3. 检查是否已登录
+    const savedKey = _saasGetKey();
+    if (savedKey) {
+        // 验证 API Key 是否有效
+        fetch('/api/tenants/me', {
+            headers: {'Authorization': 'Bearer ' + savedKey}
+        }).then(r => {
+            if (r.ok) {
+                initApp();
+            } else {
+                // Key 无效，清除并显示登录
+                _saasLogout();
+            }
+        }).catch(() => {
+            // 网络错误，仍然尝试进入
+            initApp();
+        });
+    } else {
+        showLoginScreen();
+    }
+})();
 
 requestAnimationFrame(() => {
     document.body.classList.add('transition-colors', 'duration-200');

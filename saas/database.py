@@ -56,6 +56,8 @@ class User(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=_gen_id)
     tenant_id = db.Column(db.String(36), db.ForeignKey("tenants.id"), nullable=False, index=True)
     email = db.Column(db.String(256), nullable=False)
+    name = db.Column(db.String(128), nullable=True)  # 用户显示名称
+    password_hash = db.Column(db.String(128), nullable=True)  # 邮箱登录密码哈希
     display_name = db.Column(db.String(128), nullable=True)
     role = db.Column(db.String(32), nullable=False, default="member")  # owner / admin / member
     sso_uid = db.Column(db.String(256), nullable=True, unique=True)  # SSO 身份标识 (provider:id)
