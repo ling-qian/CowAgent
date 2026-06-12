@@ -22,6 +22,8 @@ import secrets
 import hashlib
 import urllib.parse
 
+from werkzeug.security import generate_password_hash, check_password_hash
+
 from flask import Blueprint, request, jsonify, redirect, current_app
 
 from saas.database import db, Tenant, User, ApiKey
@@ -454,13 +456,12 @@ def email_register():
         name=name,
         slug=slug,
         plan="free",
-        email=email,
     )
     db.session.add(tenant)
     db.session.flush()
 
-    # 创建用户
-    pw_hash = hashlib.sha256(password.encode()).hexdigest()
+    # 创建用户（使用 werkzeug pbkdf2 哈希，兼容 Python 3.9）
+    pw_hash = generate_password_hash(password, method="pbkdf2:sha256", salt_length=16)
     user = User(
         tenant_id=tenant.id,
         email=email,
@@ -482,9 +483,26 @@ def email_register():
         key_prefix=key_prefix,
     )
     db.session.add(api_key)
+
+    # 创建默认 AgentConfig（确保新租户可走 AgentFactory 路径）
+    from saas.database import AgentConfig
+    default_config = AgentConfig(
+        tenant_id=tenant.id,
+        name="Default Agent",
+        model="",
+        api_key="",
+        api_base="",
+        system_prompt="",
+        temperature=0.7,
+        max_steps=15,
+        tools="",
+        knowledge_ids="",
+    )
+    db.session.add(default_config)
+
     db.session.commit()
 
-    audit_log("tenant.register", tenant_id=tenant.id, details={"email": email, "method": "email"})
+    audit_log("tenant.register", "tenant", resource_id=tenant.id, detail=f"email={email}, method=email", tenant_id=tenant.id)
 
     return jsonify({
         "api_key": raw_key,
@@ -508,8 +526,20 @@ def email_login():
     if not user:
         return jsonify({"error": "invalid email or password"}), 401
 
-    pw_hash = hashlib.sha256(password.encode()).hexdigest()
-    if user.password_hash != pw_hash:
+    # 密码验证：先试 werkzeug，失败回退 SHA256（兼容旧密码）
+    pw_valid = False
+    if user.password_hash:
+        # werkzeug 哈希格式以 pbkdf2: 或 scrypt: 开头
+        if user.password_hash.startswith("pbkdf2:") or user.password_hash.startswith("scrypt:"):
+            pw_valid = check_password_hash(user.password_hash, password)
+        else:
+            # 旧格式：SHA256 hex
+            pw_valid = (user.password_hash == hashlib.sha256(password.encode()).hexdigest())
+            # 登录成功后自动升级为 werkzeug 哈希
+            if pw_valid:
+                user.password_hash = generate_password_hash(password, method="pbkdf2:sha256", salt_length=16)
+                db.session.commit()
+    if not pw_valid:
         return jsonify({"error": "invalid email or password"}), 401
 
     # 查找或创建 API Key
@@ -540,7 +570,7 @@ def email_login():
         db.session.add(session_key)
         db.session.commit()
 
-    audit_log("user.login", tenant_id=user.tenant_id, details={"email": email, "method": "email"})
+    audit_log("user.login", "user", resource_id=user.id, detail=f"email={email}, method=email", tenant_id=user.tenant_id)
 
     return jsonify({
         "api_key": raw_key,

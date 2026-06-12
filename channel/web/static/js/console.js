@@ -1928,7 +1928,7 @@ function sendVoiceMessage(text, audioUrl) {
     function postWithRetry(attempt) {
         fetch('/message', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: _saasHeaders(),
             body: JSON.stringify(body)
         })
         .then(r => r.json())
@@ -2126,7 +2126,7 @@ async function regenerateResponse(botMsgEl) {
     function postWithRetry(attempt) {
         fetch('/message', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: _saasHeaders(),
             body: JSON.stringify(body)
         })
         .then(r => r.json())
@@ -2217,7 +2217,7 @@ function sendMessage() {
     function postWithRetry(attempt) {
         fetch('/message', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: _saasHeaders(),
             body: JSON.stringify(body)
         })
         .then(r => r.json())
@@ -7779,6 +7779,13 @@ function _saasSaveKey(apiKey, tenantId) {
 
 function _saasGetKey() {
     return localStorage.getItem('cow_api_key');
+}
+
+function _saasHeaders() {
+    const h = { 'Content-Type': 'application/json' };
+    const key = _saasGetKey();
+    if (key) h['Authorization'] = 'Bearer ' + key;
+    return h;
 }
 
 function _saasLogout() {

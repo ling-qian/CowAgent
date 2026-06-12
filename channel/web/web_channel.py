@@ -15,6 +15,9 @@ from typing import List, Tuple
 
 import web
 
+import urllib.request
+import urllib.error
+
 from bridge.context import *
 from bridge.reply import Reply, ReplyType
 from channel.chat_channel import ChatChannel, check_prefix
@@ -250,6 +253,33 @@ class WebChannel(ChatChannel):
     def _generate_request_id(self):
         """生成唯一的请求ID"""
         return str(uuid.uuid4())
+
+    def _resolve_tenant_from_request(self):
+        """从当前 HTTP 请求的 Authorization header 解析 tenant_id
+
+        仅在 saas_mode=True 时生效。无 API Key 时返回 None（不影响原有逻辑）。
+        """
+        import web
+        env = web.ctx.env or {}
+        # web.py 把 HTTP_AUTHORIZATION 存为 HTTP_AUTHORIZATION
+        auth_header = env.get("HTTP_AUTHORIZATION", "")
+        if not auth_header.startswith("Bearer "):
+            return None
+        raw_key = auth_header[7:].strip()
+        if not raw_key.startswith("sk-"):
+            return None
+
+        from saas.middleware import _resolve_api_key
+        # 需要在 Flask 应用上下文中执行数据库查询
+        try:
+            import saas as _saas_mod
+            flask_app = _saas_mod.get_flask_app()
+            if flask_app:
+                with flask_app.app_context():
+                    return _resolve_api_key(raw_key)
+        except Exception as e:
+            logger.warning(f"[WebChannel] Failed to resolve tenant with Flask context: {e}")
+        return _resolve_api_key(raw_key)
 
     def _fetch_latest_pair_seqs(self, session_id: str):
         """Query the conversation store for the latest user/bot message seqs.
@@ -877,6 +907,16 @@ class WebChannel(ChatChannel):
             context["session_id"] = session_id
             context["receiver"] = session_id
             context["request_id"] = request_id
+
+            # SaaS 租户感知：从 Authorization header 提取 tenant_id
+            if conf().get("saas_mode", False):
+                try:
+                    tenant_id = self._resolve_tenant_from_request()
+                    if tenant_id:
+                        context["tenant_id"] = tenant_id
+                        logger.debug(f"[WebChannel] Tenant resolved: {tenant_id}")
+                except Exception as e:
+                    logger.warning(f"[WebChannel] Failed to resolve tenant: {e}")
             if is_voice_input:
                 # Web channel runs its own TTS post-pipeline via
                 # _maybe_dispatch_auto_tts; don't set desire_rtype here or
@@ -1154,6 +1194,19 @@ class WebChannel(ChatChannel):
             '/api/messages/delete', 'MessageDeleteHandler',
             '/api/logs', 'LogsHandler',
             '/api/version', 'VersionHandler',
+            '/api/auth/(.*)', 'SaasProxyHandler',
+            '/api/tenants/(.*)', 'SaasProxyHandler',
+            '/api/keys/(.*)', 'SaasProxyHandler',
+            '/api/usage/(.*)', 'SaasProxyHandler',
+            '/api/billing/(.*)', 'SaasProxyHandler',
+            '/api/audit/(.*)', 'SaasProxyHandler',
+            '/api/webhooks/(.*)', 'SaasProxyHandler',
+            '/api/plugins/(.*)', 'SaasProxyHandler',
+            '/api/gdpr/(.*)', 'SaasProxyHandler',
+            '/api/im-channels/(.*)', 'SaasProxyHandler',
+            '/api/chat/(.*)', 'SaasProxyHandler',
+            '/api/agent/(.*)', 'SaasProxyHandler',
+            '/api/health', 'SaasProxyHandler',
             '/assets/(.*)', 'AssetsHandler',
         )
         app = web.application(urls, globals(), autoreload=False)
@@ -1240,6 +1293,149 @@ class AuthLogoutHandler:
         web.header('Content-Type', 'application/json; charset=utf-8')
         web.setcookie("cow_auth_token", "", expires=-1, path="/")
         return json.dumps({"status": "success"})
+
+
+# ---------------------------------------------------------------------------
+# SaaS API Reverse Proxy
+# Proxies requests from WebChannel (e.g. port 9899) to the SaaS Flask app
+# (e.g. port 8081) so the frontend can call /api/auth/*, /api/tenants/*, etc.
+# ---------------------------------------------------------------------------
+
+_SAAS_API_PREFIXES = (
+    "/api/auth/",
+    "/api/tenants/",
+    "/api/keys/",
+    "/api/usage/",
+    "/api/billing/",
+    "/api/audit/",
+    "/api/webhooks/",
+    "/api/plugins/",
+    "/api/gdpr/",
+    "/api/im-channels/",
+    "/api/chat/",
+    "/api/agent/",
+    "/api/health",
+)
+
+
+def _saas_api_base():
+    """Return the base URL of the SaaS Flask API (e.g. http://127.0.0.1:8081)."""
+    port = int(conf().get("saas_api_port", 8081))
+    return f"http://127.0.0.1:{port}"
+
+
+class SaasProxyHandler:
+    """Reverse-proxy handler that forwards SaaS API requests to the Flask app.
+
+    Supports SSE streaming: when the upstream response is text/event-stream,
+    the proxy yields chunks incrementally instead of buffering the full body.
+    """
+
+    def _proxy(self, method):
+        if not conf().get("saas_mode", False):
+            web.header('Content-Type', 'application/json; charset=utf-8')
+            web.ctx.status = '404 Not Found'
+            return json.dumps({"error": "SaaS mode is not enabled"})
+
+        # 请求体大小限制（10MB）
+        body = web.data() if method != "GET" else None
+        if body and len(body) > 10 * 1024 * 1024:
+            web.header('Content-Type', 'application/json; charset=utf-8')
+            web.ctx.status = '413 Payload Too Large'
+            return json.dumps({"error": "Request body too large (max 10MB)"})
+
+        # Reconstruct the original path from web.ctx
+        path = web.ctx.env.get("PATH_INFO", "")
+        query = web.ctx.env.get("QUERY_STRING", "")
+        target_url = _saas_api_base() + path
+        if query:
+            target_url += "?" + query
+
+        # Forward headers
+        headers = {"Content-Type": web.ctx.env.get("CONTENT_TYPE", "application/json")}
+        auth = web.ctx.env.get("HTTP_AUTHORIZATION")
+        if auth:
+            headers["Authorization"] = auth
+        cookie = web.ctx.env.get("HTTP_COOKIE")
+        if cookie:
+            headers["Cookie"] = cookie
+        accept = web.ctx.env.get("HTTP_ACCEPT")
+        if accept:
+            headers["Accept"] = accept
+
+        req = urllib.request.Request(target_url, data=body, method=method, headers=headers)
+        try:
+            resp = urllib.request.urlopen(req, timeout=120)
+            content_type = resp.headers.get("Content-Type", "application/json")
+
+            # SSE streaming: yield chunks incrementally
+            if "text/event-stream" in content_type:
+                web.header("Content-Type", "text/event-stream")
+                web.header("Cache-Control", "no-cache")
+                web.header("X-Accel-Buffering", "no")
+                for h in ("Access-Control-Allow-Origin", "Access-Control-Allow-Headers",
+                          "Access-Control-Allow-Methods", "Access-Control-Allow-Credentials"):
+                    v = resp.headers.get(h)
+                    if v:
+                        web.header(h, v)
+
+                def stream_response():
+                    try:
+                        while True:
+                            chunk = resp.read(4096)
+                            if not chunk:
+                                break
+                            yield chunk
+                    finally:
+                        resp.close()
+
+                return stream_response()
+
+            # Non-streaming: read full response
+            resp_body = resp.read()
+            web.header("Content-Type", content_type)
+            for h in ("Access-Control-Allow-Origin", "Access-Control-Allow-Headers",
+                      "Access-Control-Allow-Methods", "Access-Control-Allow-Credentials"):
+                v = resp.headers.get(h)
+                if v:
+                    web.header(h, v)
+            web.ctx.status = f"{resp.status} {resp.reason}"
+            return resp_body
+        except urllib.error.HTTPError as e:
+            web.header("Content-Type", "application/json; charset=utf-8")
+            web.ctx.status = f"{e.code} {e.reason}"
+            try:
+                return e.read()
+            except Exception:
+                return json.dumps({"error": e.reason})
+        except Exception as e:
+            logger.error(f"[SaasProxy] Proxy error: {e}")
+            web.header("Content-Type", "application/json; charset=utf-8")
+            web.ctx.status = "502 Bad Gateway"
+            return json.dumps({"error": f"SaaS API unreachable: {str(e)}"})
+
+    def GET(self, path=""):
+        return self._proxy("GET")
+
+    def POST(self, path=""):
+        return self._proxy("POST")
+
+    def PUT(self, path=""):
+        return self._proxy("PUT")
+
+    def DELETE(self, path=""):
+        return self._proxy("DELETE")
+
+    def PATCH(self, path=""):
+        return self._proxy("PATCH")
+
+    def OPTIONS(self, path=""):
+        web.header("Access-Control-Allow-Origin", "*")
+        web.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key, X-Tenant-ID")
+        web.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
+        web.header("Access-Control-Max-Age", "86400")
+        web.ctx.status = "204 No Content"
+        return ""
 
 
 class MessageHandler:

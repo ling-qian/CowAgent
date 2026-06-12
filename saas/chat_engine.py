@@ -122,6 +122,9 @@ def _get_tenant_llm_config(tenant_id: str) -> dict:
         if c.get("open_ai_api_key"):
             config["api_key"] = c["open_ai_api_key"]
             config["api_base"] = c.get("open_ai_api_base", "https://api.openai.com/v1")
+        if c.get("custom_api_key"):
+            config["api_key"] = c["custom_api_key"]
+            config["api_base"] = c.get("custom_api_base", "https://api.openai.com/v1")
     except Exception:
         pass
 

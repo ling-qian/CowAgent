@@ -195,17 +195,56 @@ class ChatChannel(Channel):
         if context is None or not context.content:
             return
         logger.debug("[chat_channel] handling context: {}".format(context))
-        # reply的构建步骤
-        reply = self._generate_reply(context)
 
-        logger.debug("[chat_channel] decorating reply: {}".format(reply))
+        # SaaS 租户感知：应用租户配置，处理完后恢复
+        tenant_id = context.get("tenant_id")
+        original_config = None
+        if tenant_id:
+            try:
+                from saas.chat_engine import _apply_tenant_config, _restore_config
+                # 在 Flask 应用上下文中执行数据库查询
+                import saas as _saas_mod
+                flask_app = _saas_mod.get_flask_app()
+                app_ctx = None
+                if flask_app:
+                    app_ctx = flask_app.app_context()
+                    app_ctx.push()
+                try:
+                    original_config = _apply_tenant_config(tenant_id)
+                finally:
+                    if app_ctx:
+                        app_ctx.pop()
+                # 重置 Bridge 使其重新读取租户配置
+                from bridge.bridge import Bridge
+                Bridge().reset_bot()
+                logger.debug(f"[chat_channel] Applied tenant config for {tenant_id}")
+            except Exception as e:
+                logger.warning(f"[chat_channel] Failed to apply tenant config: {e}")
+                original_config = None
 
-        # reply的包装步骤
-        if reply and reply.content:
-            reply = self._decorate_reply(context, reply)
+        try:
+            # reply的构建步骤
+            reply = self._generate_reply(context)
 
-            # reply的发送步骤
-            self._send_reply(context, reply)
+            logger.debug("[chat_channel] decorating reply: {}".format(reply))
+
+            # reply的包装步骤
+            if reply and reply.content:
+                reply = self._decorate_reply(context, reply)
+
+                # reply的发送步骤
+                self._send_reply(context, reply)
+        finally:
+            # 恢复全局配置 + 重置 Bridge
+            if original_config is not None:
+                try:
+                    from saas.chat_engine import _restore_config
+                    _restore_config(original_config)
+                    from bridge.bridge import Bridge
+                    Bridge().reset_bot()
+                    logger.debug(f"[chat_channel] Restored config after tenant {tenant_id}")
+                except Exception as e:
+                    logger.warning(f"[chat_channel] Failed to restore config: {e}")
 
     def _generate_reply(self, context: Context, reply: Reply = Reply()) -> Reply:
         e_context = PluginManager().emit_event(

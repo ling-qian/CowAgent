@@ -489,7 +489,8 @@ class AgentFactory:
         try:
             from config import conf
             c = conf()
-            return (c.get("open_ai_api_key") or c.get("deepseek_api_key") or "")
+            return (c.get("open_ai_api_key") or c.get("deepseek_api_key") or
+                    c.get("custom_api_key") or "")
         except Exception:
             return ""
 
@@ -503,6 +504,7 @@ class AgentFactory:
             from config import conf
             c = conf()
             return (c.get("open_ai_api_base") or c.get("deepseek_api_base") or
+                    c.get("custom_api_base") or
                     "https://api.openai.com/v1")
         except Exception:
             return "https://api.openai.com/v1"
