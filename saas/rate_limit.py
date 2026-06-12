@@ -1,241 +1,223 @@
 # encoding:utf-8
 """
-租户级 API 限流
+API 限流 — 基于租户的滑动窗口限流
 
-基于套餐配额的滑动窗口限流：
-- free: 60 次/分钟
-- pro: 300 次/分钟
-- enterprise: 不限流
+按租户 + 端点维度限制请求频率，防止滥用。
+使用 Redis 或内存缓存作为计数器后端，与 saas.cache 共享基础设施。
 
-实现方式：
-- 内存滑动窗口计数器（生产环境可替换为 Redis）
-- 集成到 Flask before_request 中间件
-- 超限返回 429 Too Many Requests
+限流维度：
+- 全局限流：每租户每分钟最大请求数
+- 端点限流：特定端点（如 /api/chat/completions）的独立限制
+
+套餐限流配置：
+- free:  20 req/min (全局), 10 req/min (chat)
+- pro:   120 req/min (全局), 60 req/min (chat)
+- enterprise: 600 req/min (全局), 300 req/min (chat)
 """
 
 import time
 import threading
-from collections import defaultdict
+from typing import Optional, Tuple
 
 from common.log import logger
+
 
 # ---------------------------------------------------------------------------
 # 套餐限流配置
 # ---------------------------------------------------------------------------
 
 RATE_LIMITS = {
-    "free": 60,        # 60 次/分钟
-    "pro": 300,        # 300 次/分钟
-    "enterprise": -1,  # 不限流
+    "free": {
+        "global": 20,       # 20 req/min
+        "chat": 10,         # 10 req/min for /api/chat/completions
+    },
+    "pro": {
+        "global": 120,
+        "chat": 60,
+    },
+    "enterprise": {
+        "global": 600,
+        "chat": 300,
+    },
 }
 
-DEFAULT_RATE_LIMIT = 60  # 未知套餐默认限流
+# 固定窗口大小（秒）
+WINDOW_SIZE = 60
 
 
-def get_rate_limit(plan_id: str) -> int:
-    """获取套餐对应的每分钟请求上限，-1 表示不限流"""
-    return RATE_LIMITS.get(plan_id, DEFAULT_RATE_LIMIT)
+def get_rate_limit(plan: str, endpoint_type: str = "global") -> int:
+    """获取套餐对应的限流值，未知套餐降级为 free"""
+    plan_limits = RATE_LIMITS.get(plan, RATE_LIMITS["free"])
+    return plan_limits.get(endpoint_type, plan_limits["global"])
 
 
 # ---------------------------------------------------------------------------
 # 滑动窗口计数器
 # ---------------------------------------------------------------------------
 
-class SlidingWindowCounter:
-    """线程安全的滑动窗口计数器
+class RateLimiter:
+    """基于缓存的滑动窗口限流器
 
-    使用分钟级时间桶实现近似滑动窗口：
-    - 每个桶记录 1 分钟内的请求数
-    - 窗口大小 = 1 分钟
-    - 自动清理过期桶
+    使用 saas.cache 后端存储计数器，Redis 不可用时自动降级为内存。
+    线程安全，支持高并发。
     """
 
+    PREFIX = "saas:ratelimit:"
+
     def __init__(self):
-        self._buckets = defaultdict(dict)  # tenant_id -> {minute_ts: count}
+        self._local_counters = {}  # 内存回退计数器
         self._lock = threading.Lock()
 
-    def increment(self, tenant_id: str, window_seconds: int = 60) -> int:
-        """递增计数并返回当前窗口内的总请求数
+    def check(self, tenant_id: str, endpoint_type: str = "global",
+              plan: str = "free") -> Tuple[bool, int, int, int]:
+        """检查请求是否被限流
 
         Args:
             tenant_id: 租户 ID
-            window_seconds: 窗口大小（秒），默认 60
+            endpoint_type: 端点类型 (global / chat)
+            plan: 租户套餐
 
         Returns:
-            当前窗口内的总请求数
+            (allowed: bool, remaining: int, limit: int, retry_after: int)
+            retry_after 仅在 allowed=False 时有意义（秒）
         """
+        limit = get_rate_limit(plan, endpoint_type)
         now = time.time()
-        current_minute = int(now // window_seconds)
+        window_key = int(now // WINDOW_SIZE)  # 当前窗口编号
+        cache_key = f"{self.PREFIX}{tenant_id}:{endpoint_type}:{window_key}"
 
-        with self._lock:
-            buckets = self._buckets[tenant_id]
-
-            # 清理过期桶（2 分钟前的）
-            expired = [ts for ts in buckets if ts < current_minute - 1]
-            for ts in expired:
-                del buckets[ts]
-
-            # 递增当前桶
-            buckets[current_minute] = buckets.get(current_minute, 0) + 1
-
-            # 计算窗口内总请求数
-            total = sum(
-                count for ts, count in buckets.items()
-                if ts >= current_minute - 1
-            )
-            return total
-
-    def get_count(self, tenant_id: str, window_seconds: int = 60) -> int:
-        """获取当前窗口内的请求数（不递增）"""
-        now = time.time()
-        current_minute = int(now // window_seconds)
-
-        with self._lock:
-            buckets = self._buckets.get(tenant_id, {})
-            return sum(
-                count for ts, count in buckets.items()
-                if ts >= current_minute - 1
-            )
-
-    def reset(self, tenant_id: str = None):
-        """重置计数器"""
-        with self._lock:
-            if tenant_id:
-                self._buckets.pop(tenant_id, None)
-            else:
-                self._buckets.clear()
-
-
-# 全局计数器实例
-_rate_counter = SlidingWindowCounter()
-
-
-# ---------------------------------------------------------------------------
-# Flask 限流中间件
-# ---------------------------------------------------------------------------
-
-class RateLimitMiddleware:
-    """Flask 限流中间件 — 在 TenantMiddleware 之后执行
-
-    用法：
-        RateLimitMiddleware(app)
-
-    依赖：
-        TenantMiddleware 必须先注册（设置 g._tenant_id）
-    """
-
-    def __init__(self, app=None):
-        self.app = app
-        if app is not None:
-            self.init_app(app)
-
-    def init_app(self, app):
-        app.before_request(self._check_rate_limit)
-        app.after_request(self._add_rate_limit_headers)
-
-    def _check_rate_limit(self):
-        from flask import request, g, jsonify
-        from config import conf
-
-        if not conf().get("saas_mode", False):
-            return None
-
-        # 健康检查和静态资源不限流
-        if request.path.startswith("/health") or request.path.startswith("/static"):
-            return None
-
-        # 获取 tenant_id（由 TenantMiddleware 设置）
-        from common.tenant import current_tenant_id
-        tenant_id = current_tenant_id()
-        if not tenant_id:
-            return None  # 未认证的请求由 TenantMiddleware 处理
-
-        # 获取套餐限流配置
+        # 尝试使用缓存后端（Redis）
         try:
-            from saas.database import db, Tenant
-            tenant = db.session.get(Tenant, tenant_id)
-            if not tenant:
-                return None
-            limit = get_rate_limit(tenant.plan)
+            from saas.cache import _get_backend
+            backend = _get_backend()
+            current = backend.get(cache_key)
+            if current is None:
+                current = 0
+            else:
+                current = int(current)
+
+            if current >= limit:
+                # 计算当前窗口剩余时间
+                retry_after = WINDOW_SIZE - int(now % WINDOW_SIZE)
+                return False, 0, limit, retry_after
+
+            # 递增计数器
+            new_count = current + 1
+            # TTL 设为窗口大小的 2 倍，确保过期窗口自动清理
+            backend.set(cache_key, str(new_count), ttl=WINDOW_SIZE * 2)
+
+            remaining = max(0, limit - new_count)
+            return True, remaining, limit, 0
+
         except Exception:
-            limit = DEFAULT_RATE_LIMIT
+            pass
 
-        # 不限流
-        if limit == -1:
-            g._rate_limit = -1
-            g._rate_remaining = -1
-            return None
+        # 降级为内存计数器
+        return self._check_local(tenant_id, endpoint_type, limit, window_key, now)
 
-        # 滑动窗口计数
-        current_count = _rate_counter.increment(tenant_id)
-        remaining = max(0, limit - current_count)
+    def _check_local(self, tenant_id: str, endpoint_type: str,
+                     limit: int, window_key: int,
+                     now: float) -> Tuple[bool, int, int, int]:
+        """内存计数器（Redis 不可用时的降级方案）"""
+        local_key = f"{tenant_id}:{endpoint_type}:{window_key}"
 
-        g._rate_limit = limit
-        g._rate_remaining = remaining
+        with self._lock:
+            # 清理过期窗口
+            expired = [k for k, v in self._local_counters.items()
+                       if v.get("expires_at", 0) < now]
+            for k in expired:
+                del self._local_counters[k]
 
-        if current_count > limit:
-            from saas.audit import audit_log
-            audit_log(
-                action="rate_limit.exceeded",
-                resource_type="tenant",
-                resource_id=tenant_id,
-                detail=f"count={current_count}, limit={limit}",
-                tenant_id=tenant_id,
-            )
-            from saas.webhook import notify_rate_limit_exceeded
-            notify_rate_limit_exceeded(tenant_id, limit, current_count)
-            response = jsonify({
-                "error": "Rate limit exceeded",
-                "retry_after": 60,
-                "limit": limit,
-            })
-            response.status_code = 429
-            response.headers["Retry-After"] = "60"
-            return response
+            entry = self._local_counters.get(local_key)
+            if entry is None:
+                entry = {"count": 0, "expires_at": now + WINDOW_SIZE}
+                self._local_counters[local_key] = entry
 
-        return None
+            if entry["count"] >= limit:
+                retry_after = max(1, int(entry["expires_at"] - now))
+                return False, 0, limit, retry_after
 
-    def _add_rate_limit_headers(self, response):
-        from flask import g
-
-        limit = getattr(g, "_rate_limit", None)
-        remaining = getattr(g, "_rate_remaining", None)
-
-        if limit is not None:
-            response.headers["X-RateLimit-Limit"] = str(limit)
-            if remaining is not None:
-                response.headers["X-RateLimit-Remaining"] = str(remaining)
-
-        return response
+            entry["count"] += 1
+            remaining = max(0, limit - entry["count"])
+            return True, remaining, limit, 0
 
 
-# ---------------------------------------------------------------------------
-# 公共 API
-# ---------------------------------------------------------------------------
-
-def reset_rate_limit(tenant_id: str = None):
-    """重置限流计数器（用于测试或管理操作）"""
-    _rate_counter.reset(tenant_id)
+# 全局限流器实例
+_limiter = RateLimiter()
 
 
-def get_rate_limit_status(tenant_id: str) -> dict:
-    """获取租户当前限流状态
+def check_rate_limit(tenant_id: str, endpoint_type: str = "global") -> Tuple[bool, int, int, int]:
+    """检查租户请求是否被限流
+
+    自动获取租户套餐，返回限流结果。
+
+    Args:
+        tenant_id: 租户 ID
+        endpoint_type: 端点类型 (global / chat)
 
     Returns:
-        {"limit": int, "current": int, "remaining": int}
+        (allowed, remaining, limit, retry_after)
     """
+    # 获取租户套餐
+    plan = "free"
     try:
-        from saas.database import db, Tenant
-        tenant = db.session.get(Tenant, tenant_id)
-        limit = get_rate_limit(tenant.plan) if tenant else DEFAULT_RATE_LIMIT
+        from saas.database import Tenant
+        tenant = Tenant.query.get(tenant_id)
+        if tenant:
+            plan = tenant.plan
     except Exception:
-        limit = DEFAULT_RATE_LIMIT
+        pass
 
-    current = _rate_counter.get_count(tenant_id)
-    remaining = max(0, limit - current) if limit > 0 else -1
+    return _limiter.check(tenant_id, endpoint_type, plan)
 
-    return {
-        "limit": limit,
-        "current": current,
-        "remaining": remaining,
-    }
+
+# ---------------------------------------------------------------------------
+# Flask 限流装饰器
+# ---------------------------------------------------------------------------
+
+def rate_limit(endpoint_type: str = "global"):
+    """Flask 蓝图限流装饰器
+
+    用法:
+        @chat_bp.route("/completions", methods=["POST"])
+        @require_auth
+        @rate_limit("chat")
+        def completions(tenant_id):
+            ...
+    """
+    from functools import wraps
+    from flask import g, jsonify
+
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            tenant_id = getattr(g, "_tenant_id", None)
+            if not tenant_id:
+                from common.tenant import TenantContext
+                tenant_id = TenantContext.get_tenant()
+
+            if tenant_id:
+                allowed, remaining, limit, retry_after = check_rate_limit(
+                    tenant_id, endpoint_type)
+
+                if not allowed:
+                    response = jsonify({
+                        "error": "Rate limit exceeded",
+                        "retry_after": retry_after,
+                    })
+                    response.status_code = 429
+                    response.headers["Retry-After"] = str(retry_after)
+                    response.headers["X-RateLimit-Limit"] = str(limit)
+                    response.headers["X-RateLimit-Remaining"] = "0"
+                    return response
+
+                # 在响应头中附加限流信息
+                result = f(*args, **kwargs)
+                if hasattr(result, 'headers'):
+                    result.headers["X-RateLimit-Limit"] = str(limit)
+                    result.headers["X-RateLimit-Remaining"] = str(remaining)
+                return result
+
+            return f(*args, **kwargs)
+        return decorated
+    return decorator

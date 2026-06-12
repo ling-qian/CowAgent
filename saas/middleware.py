@@ -178,6 +178,15 @@ class TenantMiddleware:
 
     def _before_request(self):
         from flask import request, g
+
+        # CORS 预检请求直接放行
+        if request.method == "OPTIONS":
+            return None
+
+        # 生成请求 ID（用于追踪和调试）
+        import uuid
+        g._request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:16]
+
         import os
         saas_mode = os.environ.get("SAAS_MODE", "").lower() in ("true", "1", "yes")
         if not saas_mode:
@@ -208,17 +217,104 @@ class TenantMiddleware:
             from flask import jsonify
             return jsonify({"error": "Missing tenant authentication"}), 401
 
+        # 全局限流检查（chat 端点由 @rate_limit("chat") 单独限流，此处跳过）
+        if not request.path.startswith("/api/chat/"):
+            try:
+                from saas.rate_limit import check_rate_limit
+                allowed, remaining, limit, retry_after = check_rate_limit(tenant_id, "global")
+                if not allowed:
+                    from flask import jsonify
+                    response = jsonify({"error": "Rate limit exceeded", "retry_after": retry_after})
+                    response.status_code = 429
+                    response.headers["Retry-After"] = str(retry_after)
+                    return response
+            except Exception:
+                pass  # 限流检查失败不阻断请求
+
         token = TenantContext.set_tenant(tenant_id)
         g._tenant_token = token
         g._tenant_id = tenant_id
         return None
 
     def _after_request(self, response):
-        from flask import g
+        from flask import g, request
+
+        # 重置租户上下文
         token = g.pop("_tenant_token", None)
         if token is not None:
             TenantContext.reset(token)
+
+        # --- CORS 头 ---
+        origin = request.headers.get("Origin", "")
+        if origin:
+            # 允许的来源：同源 + 配置的白名单
+            allowed_origins = self._get_allowed_origins()
+            if origin in allowed_origins or self._is_subdomain_allowed(origin, allowed_origins):
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+            elif allowed_origins == ["*"]:
+                response.headers["Access-Control-Allow-Origin"] = "*"
+
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = (
+                "Content-Type, Authorization, X-Tenant-ID, X-Request-ID"
+            )
+            response.headers["Access-Control-Max-Age"] = "86400"
+
+        # --- 安全头 ---
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = "default-src 'self'"
+        # 生产环境应启用 HSTS
+        # response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+        # --- 敏感信息脱敏：移除可能泄露的 Server 头 ---
+        response.headers.pop("Server", None)
+        response.headers.pop("X-Powered-By", None)
+
+        # --- 请求追踪 ID ---
+        request_id = g.pop("_request_id", None)
+        if request_id:
+            response.headers["X-Request-ID"] = request_id
+
         return response
+
+    @staticmethod
+    def _get_allowed_origins():
+        """获取允许的 CORS 来源列表"""
+        try:
+            from config import conf
+            origins = conf().get("cors_allowed_origins", [])
+            if origins:
+                return origins
+        except Exception:
+            pass
+        import os
+        origins_str = os.environ.get("CORS_ALLOWED_ORIGINS", "")
+        if origins_str:
+            return [o.strip() for o in origins_str.split(",") if o.strip()]
+        # 默认：开发模式允许 localhost
+        return [
+            "http://localhost:9899",
+            "http://127.0.0.1:9899",
+            "http://localhost:8080",
+            "http://127.0.0.1:8080",
+        ]
+
+    @staticmethod
+    def _is_subdomain_allowed(origin, allowed_origins):
+        """检查 origin 是否匹配白名单中的通配符域名"""
+        from urllib.parse import urlparse
+        parsed = urlparse(origin)
+        hostname = parsed.hostname or ""
+        for allowed in allowed_origins:
+            if allowed.startswith("*."):
+                domain = allowed[2:]
+                if hostname == domain or hostname.endswith("." + domain):
+                    return True
+        return False
 
 
 # ---------------------------------------------------------------------------

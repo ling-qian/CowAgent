@@ -9,6 +9,10 @@ GET    /api/agent/models          — 获取可用模型列表
 GET    /api/agent/stats           — 获取 AgentFactory 统计信息
 GET    /api/agent/plugins         — 获取可用插件列表（含启用状态）
 GET    /api/agent/plugins/<name>  — 获取单个插件详情
+GET    /api/agent/templates       — 获取 Agent 模板列表
+GET    /api/agent/templates/<name>— 获取模板详情
+POST   /api/agent/templates/<name>/apply — 应用模板到当前配置
+POST   /api/agent/test            — 测试 Agent 配置（不保存）
 """
 
 from flask import Blueprint, request, jsonify
@@ -322,3 +326,184 @@ def get_plugin_detail(plugin_name: str):
         "available": available,
         "current_plan": tenant_plan,
     })
+
+
+# ---------------------------------------------------------------------------
+# Template API
+# ---------------------------------------------------------------------------
+
+@agent_bp.route("/templates", methods=["GET"])
+def get_templates():
+    """获取 Agent 模板列表（按分类分组）
+
+    返回所有可用模板，标注当前计划是否可用。
+    """
+    tenant_id = current_tenant_id()
+    if not tenant_id:
+        return jsonify({"error": "Tenant not authenticated"}), 401
+
+    from saas.agent_templates import get_templates_by_category, is_template_available
+
+    tenant_plan = _get_tenant_plan(tenant_id)
+    categorized = get_templates_by_category()
+
+    # 为每个模板添加 available 状态
+    result = {}
+    for cat_key, cat_data in categorized.items():
+        templates_with_status = []
+        for t in cat_data["templates"]:
+            t["available"] = is_template_available(t["name"], tenant_plan)
+            templates_with_status.append(t)
+        result[cat_key] = {
+            "display_name": cat_data["display_name"],
+            "templates": templates_with_status,
+        }
+
+    return jsonify({
+        "plan": tenant_plan,
+        "categories": result,
+    })
+
+
+@agent_bp.route("/templates/<template_name>", methods=["GET"])
+def get_template_detail(template_name: str):
+    """获取模板详情（含完整配置）"""
+    tenant_id = current_tenant_id()
+    if not tenant_id:
+        return jsonify({"error": "Tenant not authenticated"}), 401
+
+    from saas.agent_templates import get_template, is_template_available
+
+    template = get_template(template_name)
+    if not template:
+        return jsonify({"error": f"Template '{template_name}' not found"}), 404
+
+    tenant_plan = _get_tenant_plan(tenant_id)
+    available = is_template_available(template_name, tenant_plan)
+
+    return jsonify({
+        "name": template["name"],
+        "display_name": template["display_name"],
+        "description": template["description"],
+        "icon": template["icon"],
+        "category": template["category"],
+        "config": template["config"],
+        "plan_availability": template["plan_availability"],
+        "available": available,
+        "current_plan": tenant_plan,
+    })
+
+
+@agent_bp.route("/templates/<template_name>/apply", methods=["POST"])
+def apply_template(template_name: str):
+    """应用模板到当前租户的 Agent 配置
+
+    将模板的 system_prompt、plugins、tools、model 等配置
+    覆盖写入租户的 AgentConfig（名称和头像不会被覆盖）。
+    """
+    tenant_id = current_tenant_id()
+    if not tenant_id:
+        return jsonify({"error": "Tenant not authenticated"}), 401
+
+    from saas.agent_templates import apply_template as _apply, is_template_available
+
+    tenant_plan = _get_tenant_plan(tenant_id)
+    if not is_template_available(template_name, tenant_plan):
+        return jsonify({
+            "error": f"Template '{template_name}' is not available on {tenant_plan} plan",
+        }), 403
+
+    result = _apply(template_name, tenant_id)
+    if result is None:
+        return jsonify({"error": f"Template '{template_name}' not found"}), 404
+
+    audit_log(
+        tenant_id=tenant_id,
+        action="agent_template_apply",
+        resource_type="agent_config",
+        resource_id=template_name,
+        detail=f"Applied template: {template_name}",
+    )
+
+    return jsonify({
+        "message": f"Template '{template_name}' applied successfully",
+        "config": result,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Test API
+# ---------------------------------------------------------------------------
+
+@agent_bp.route("/test", methods=["POST"])
+def test_agent():
+    """测试 Agent 配置（不保存到数据库）
+
+    接受一个临时配置和测试消息，返回 Agent 的回复。
+    用于租户在保存前预览 Agent 行为。
+
+    Body:
+        {
+            "message": "Hello",
+            "config": {  // 可选，不传则使用当前配置
+                "system_prompt": "...",
+                "model": "deepseek-chat",
+                "temperature": 0.7,
+                ...
+            }
+        }
+    """
+    tenant_id = current_tenant_id()
+    if not tenant_id:
+        return jsonify({"error": "Tenant not authenticated"}), 401
+
+    data = request.get_json(silent=True) or {}
+    message = data.get("message", "").strip()
+    if not message:
+        return jsonify({"error": "message is required"}), 400
+
+    test_config = data.get("config")
+
+    try:
+        if test_config:
+            # 临时配置测试：创建临时 AgentConfig，测试后丢弃
+            from saas.database import AgentConfig
+            from saas.agent_factory import AgentFactory
+
+            config = get_or_create_default_config(tenant_id)
+            from saas.database import db
+            db.session.expunge(config)
+
+            # 覆盖测试配置
+            if "system_prompt" in test_config:
+                config.system_prompt = test_config["system_prompt"]
+            if "model" in test_config:
+                config.model = test_config["model"]
+            if "temperature" in test_config:
+                config.temperature = test_config["temperature"]
+            if "max_steps" in test_config:
+                config.max_steps = test_config["max_steps"]
+            if "enable_thinking" in test_config:
+                config.enable_thinking = test_config["enable_thinking"]
+            if "plugins" in test_config:
+                config.set_plugins(test_config["plugins"])
+
+            # 创建临时 Agent（不缓存）
+            agent = AgentFactory.get_or_create(tenant_id, config)
+            reply = agent.run(message, clear_history=True)
+            content = reply if isinstance(reply, str) else str(reply)
+        else:
+            # 使用当前配置测试
+            from saas.chat_engine import chat
+            result = chat(tenant_id=tenant_id, message=message)
+            content = result.get("content", "")
+
+        return jsonify({
+            "message": message,
+            "reply": content,
+        })
+
+    except Exception as e:
+        return jsonify({
+            "error": f"Test failed: {str(e)}",
+        }), 500

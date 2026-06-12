@@ -11,7 +11,8 @@ GET  /api/chat/models        — 列出可用模型
 import json
 from flask import Blueprint, request, jsonify, g, Response
 from saas.middleware import require_auth
-from saas.chat_engine import chat, list_sessions, clear_session, get_available_models, _get_tenant_llm_config
+from saas.rate_limit import rate_limit
+from saas.chat_engine import chat, chat_stream, list_sessions, clear_session, get_available_models, _get_tenant_llm_config
 from common.log import logger
 
 chat_bp = Blueprint("chat", __name__)
@@ -19,6 +20,7 @@ chat_bp = Blueprint("chat", __name__)
 
 @chat_bp.route("/completions", methods=["POST"])
 @require_auth
+@rate_limit("chat")
 def completions(tenant_id):
     """发送消息并获取 AI 回复
 
@@ -48,18 +50,17 @@ def completions(tenant_id):
     stream = data.get("stream", False)
 
     try:
-        result = chat(
-            tenant_id=tenant_id,
-            message=message,
-            session_id=session_id,
-            system_prompt=system_prompt,
-            stream=stream,
-        )
+        if stream:
+            # 流式 SSE 响应
+            chunk_gen = chat_stream(
+                tenant_id=tenant_id,
+                message=message,
+                session_id=session_id,
+                system_prompt=system_prompt,
+            )
 
-        if stream and hasattr(result, '__iter__') and not isinstance(result, dict):
-            # SSE 流式响应
             def generate():
-                for chunk in result:
+                for chunk in chunk_gen:
                     yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
                 yield "data: [DONE]\n\n"
 
@@ -69,9 +70,16 @@ def completions(tenant_id):
                 headers={
                     "Cache-Control": "no-cache",
                     "X-Accel-Buffering": "no",
+                    "Connection": "keep-alive",
                 },
             )
         else:
+            result = chat(
+                tenant_id=tenant_id,
+                message=message,
+                session_id=session_id,
+                system_prompt=system_prompt,
+            )
             return jsonify(result)
 
     except Exception as e:

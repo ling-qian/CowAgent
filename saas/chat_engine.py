@@ -13,6 +13,8 @@ import json
 import os
 import uuid
 import threading
+import queue
+import time
 
 from common.log import logger
 
@@ -362,6 +364,13 @@ def _record_usage(tenant_id: str, prompt_tokens: int, completion_tokens: int):
         )
         if not allowed:
             logger.warning(f"[ChatEngine] Quota exceeded for tenant {tenant_id}, tokens={total}")
+        # 同时记录 API 调用次数
+        record_usage(
+            tenant_id=tenant_id,
+            metric="api_calls",
+            value=1,
+            api_key_id=None,
+        )
     except Exception as e:
         logger.warning(f"[ChatEngine] Failed to record usage: {e}")
 
@@ -408,6 +417,252 @@ def chat(
 
     # Bridge 模式
     return _chat_via_bridge(tenant_id, message, session_id, system_prompt)
+
+
+# ---------------------------------------------------------------------------
+# 流式对话入口
+# ---------------------------------------------------------------------------
+
+# 事件类型映射：agent 内部事件 → SaaS SSE chunk
+_EVENT_MAP = {
+    "reasoning_update": "reasoning",
+    "message_update": "content",
+    "tool_execution_start": "tool_start",
+    "tool_execution_end": "tool_end",
+    "turn_end": "turn_end",
+}
+
+_STREAM_SENTINEL = object()  # 标记流结束
+
+
+def chat_stream(tenant_id: str, message: str, session_id: str = None,
+                system_prompt: str = None):
+    """流式对话生成器 — yield OpenAI 兼容的 SSE chunk
+
+    不影响现有 chat() 函数，是独立的流式路径。
+
+    yield 格式:
+        {"choices": [{"delta": {"content/reasoning_content/tool_calls"}, "finish_reason": null|"stop"}]}
+    """
+    if not session_id:
+        session_id = f"tenant_{tenant_id}_{uuid.uuid4().hex[:8]}"
+
+    _track_session(tenant_id, session_id)
+
+    # 创建事件队列
+    event_queue = queue.Queue()
+
+    def on_event(event: dict):
+        """Bridge on_event 回调 → 将事件放入队列"""
+        event_queue.put(event)
+
+    # 在子线程中执行对话（需要 Flask app context 做数据库操作）
+    def _run_chat():
+        import saas as _saas_mod
+        flask_app = _saas_mod.get_flask_app()
+        app_ctx = None
+        if flask_app:
+            app_ctx = flask_app.app_context()
+            app_ctx.push()
+        try:
+            if _use_agent_factory(tenant_id):
+                try:
+                    _stream_via_factory(tenant_id, message, session_id,
+                                        system_prompt, on_event)
+                    return
+                except Exception as e:
+                    logger.warning(f"[ChatEngine] Factory stream failed, fallback to Bridge: {e}")
+
+            _stream_via_bridge(tenant_id, message, session_id,
+                               system_prompt, on_event)
+        except Exception as e:
+            event_queue.put({"type": "error", "data": {"message": str(e)}})
+        finally:
+            if app_ctx:
+                app_ctx.pop()
+            event_queue.put(_STREAM_SENTINEL)
+
+    thread = threading.Thread(target=_run_chat, daemon=True)
+    thread.start()
+
+    # 从队列中 yield 事件
+    accumulated_content = ""
+    while True:
+        try:
+            item = event_queue.get(timeout=120)
+        except queue.Empty:
+            yield _make_chunk(delta={"content": "[timeout]"}, finish_reason="stop")
+            break
+
+        if item is _STREAM_SENTINEL:
+            if not accumulated_content:
+                yield _make_chunk(delta={"content": ""}, finish_reason="stop")
+            break
+
+        event_type = item.get("type", "")
+        data = item.get("data", {})
+
+        if event_type == "error":
+            yield _make_chunk(delta={"content": f"Error: {data.get('message', 'unknown')}"}, finish_reason="stop")
+            break
+
+        elif event_type == "reasoning_update":
+            delta_text = data.get("delta", "")
+            if delta_text:
+                yield _make_chunk(delta={"reasoning_content": delta_text})
+
+        elif event_type == "message_update":
+            delta_text = data.get("delta", "")
+            if delta_text:
+                accumulated_content += delta_text
+                yield _make_chunk(delta={"content": delta_text})
+
+        elif event_type == "message_end":
+            # message_end 包含完整 tool_calls 信息，用于最终 tool call 输出
+            tool_calls = data.get("tool_calls", [])
+            if tool_calls:
+                for i, tc in enumerate(tool_calls):
+                    yield _make_chunk(delta={
+                        "tool_calls": [{
+                            "index": i,
+                            "id": tc.get("id", f"call_{i}"),
+                            "type": "function",
+                            "function": {
+                                "name": tc.get("function", {}).get("name", ""),
+                                "arguments": tc.get("function", {}).get("arguments", ""),
+                            },
+                        }]
+                    })
+
+        elif event_type == "tool_execution_start":
+            tool_name = data.get("tool_name", "")
+            arguments = data.get("arguments", {})
+            tool_call_id = data.get("tool_call_id", tool_name)
+            yield _make_chunk(delta={
+                "tool_calls": [{
+                    "index": 0,
+                    "id": tool_call_id,
+                    "type": "function",
+                    "function": {"name": tool_name, "arguments": json.dumps(arguments, ensure_ascii=False)},
+                }]
+            })
+
+        elif event_type == "turn_end":
+            has_tool_calls = data.get("has_tool_calls", False)
+            if not has_tool_calls:
+                yield _make_chunk(delta={}, finish_reason="stop")
+                break
+            # has_tool_calls=True → 继续等待下一轮
+
+        elif event_type == "agent_end":
+            # Agent 执行结束，确保流关闭
+            if accumulated_content:
+                yield _make_chunk(delta={}, finish_reason="stop")
+            break
+
+
+def _make_chunk(delta: dict, finish_reason=None) -> dict:
+    """构造 OpenAI 兼容的 SSE chunk"""
+    return {
+        "choices": [{
+            "index": 0,
+            "delta": delta,
+            "finish_reason": finish_reason,
+        }],
+    }
+
+
+def _stream_via_factory(tenant_id, message, session_id, system_prompt, on_event):
+    """AgentFactory 模式流式对话"""
+    from saas.agent_factory import AgentFactory, get_or_create_default_config
+    config = get_or_create_default_config(tenant_id)
+    from saas.database import db
+    db.session.expunge(config)
+    if system_prompt:
+        config.system_prompt = system_prompt
+
+    agent = AgentFactory.get_or_create(tenant_id, config)
+
+    # 用包装回调追踪内容，用于估算 token
+    accumulated = {"content": ""}
+
+    def _wrapped_on_event(event: dict):
+        if event.get("type") == "message_update":
+            delta = event.get("data", {}).get("delta", "")
+            if delta:
+                accumulated["content"] += delta
+        on_event(event)
+
+    agent.run_stream(message, clear_history=False, on_event=_wrapped_on_event)
+
+    # 估算 token 用量
+    prompt_tokens = int(len(message) * 1.5)
+    completion_tokens = int(len(accumulated["content"]) * 1.5)
+    _record_usage(tenant_id, prompt_tokens, completion_tokens)
+
+
+def _stream_via_bridge(tenant_id, message, session_id, system_prompt, on_event):
+    """Bridge 模式流式对话"""
+    _ensure_config_loaded()
+    original_config = _apply_tenant_config(tenant_id)
+
+    # 用包装回调追踪内容，用于估算 token
+    accumulated = {"content": ""}
+
+    def _wrapped_on_event(event: dict):
+        if event.get("type") == "message_update":
+            delta = event.get("data", {}).get("delta", "")
+            if delta:
+                accumulated["content"] += delta
+        on_event(event)
+
+    try:
+        bridge = _get_bridge()
+        bridge.reset_bot()
+
+        from bridge.context import Context, ContextType
+        context = Context(ContextType.TEXT, content=message)
+        context.kwargs["session_id"] = session_id
+        context.kwargs["channel_type"] = "saas_api_stream"
+
+        if system_prompt:
+            from config import conf
+            conf()["character_desc"] = system_prompt
+
+        try:
+            from config import conf
+            use_agent = conf().get("agent", True)
+
+            if use_agent:
+                reply = bridge.fetch_agent_reply(
+                    query=message,
+                    context=context,
+                    on_event=_wrapped_on_event,
+                    clear_history=False,
+                )
+            else:
+                reply = bridge.fetch_reply_content(query=message, context=context)
+
+            # 如果 on_event 没有触发 message_update（非 agent 模式），
+            # 手动发送内容
+            if not use_agent and reply.content:
+                accumulated["content"] = reply.content
+                on_event({"type": "message_update", "data": {"delta": reply.content}})
+                on_event({"type": "turn_end", "data": {"has_tool_calls": False}})
+
+        except Exception as inner_e:
+            logger.error(f"[ChatEngine] Bridge stream error: {inner_e}", exc_info=True)
+            raise
+
+    except Exception as e:
+        logger.error(f"[ChatEngine] Bridge stream setup error: {e}", exc_info=True)
+        raise
+    finally:
+        _restore_config(original_config)
+        # 记录用量
+        prompt_tokens = int(len(message) * 1.5)
+        completion_tokens = int(len(accumulated["content"]) * 1.5)
+        _record_usage(tenant_id, prompt_tokens, completion_tokens)
 
 
 # ---------------------------------------------------------------------------
